@@ -1,0 +1,186 @@
+"""
+Helpers for dealing with vectorized environments.
+"""
+
+from collections import OrderedDict
+from typing import Any, Dict
+
+import gym
+import gym.spaces as spaces
+import numpy as np
+import torch
+
+
+def compress_dict(d: Dict[str, Any], pre="") -> Dict[str, Any]:
+    """
+    Compresses a dictionary to only have one "level"
+    """
+    ret_d = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            ret_d.update(compress_dict(v, f"{k}."))
+        else:
+            ret_d[pre + k] = str(v)
+    return ret_d
+
+
+def compress_and_filter_dict(d: Dict[str, Any], pre="") -> Dict[str, Any]:
+    """
+    Compresses a dictionary to only have one "level"
+    """
+    ret_d = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            ret_d.update(compress_and_filter_dict(v, f"{k}."))
+        elif isinstance(v, (float, int, np.float32, np.float64, np.uint, np.int32)):
+            ret_d[pre + k] = v
+    return ret_d
+
+
+def copy_obs_dict(obs):
+    """
+    Deep-copy an observation dict.
+    """
+    return {k: np.copy(v) for k, v in obs.items()}
+
+
+def dict_to_obs(obs_dict):
+    """
+    Convert an observation dict into a raw array if the
+    original observation space was not a Dict space.
+    """
+    if set(obs_dict.keys()) == {None}:
+        return obs_dict[None]
+    return obs_dict
+
+
+def obs_space_info(obs_space):
+    """
+    Get dict-structured information about a gym.Space.
+
+    Returns:
+      A tuple (keys, shapes, dtypes):
+        keys: a list of dict keys.
+        shapes: a dict mapping keys to shapes.
+        dtypes: a dict mapping keys to dtypes.
+    """
+    if isinstance(obs_space, gym.spaces.Dict):
+        assert isinstance(obs_space.spaces, OrderedDict)
+        subspaces = obs_space.spaces
+    else:
+        subspaces = {None: obs_space}
+    keys = []
+    shapes = {}
+    dtypes = {}
+    for key, box in subspaces.items():
+        keys.append(key)
+        shapes[key] = box.shape
+        dtypes[key] = box.dtype
+    return keys, shapes, dtypes
+
+
+def obs_to_dict(obs):
+    """
+    Convert an observation into a dict.
+    """
+    if isinstance(obs, dict):
+        return obs
+    return {None: obs}
+
+
+def reshape_obs_space(obs_space, new_shape):
+    assert isinstance(obs_space, gym.spaces.Box)
+    return gym.spaces.Box(
+        shape=new_shape,
+        high=obs_space.low.reshape(-1)[0],
+        low=obs_space.high.reshape(-1)[0],
+        dtype=obs_space.dtype,
+    )
+
+
+def is_dict_obs(ob_space):
+    return isinstance(ob_space, gym.spaces.Dict)
+
+
+def update_obs_space(cur_space, update_obs_space):
+    if is_dict_obs(cur_space):
+        new_obs_space = {**cur_space.spaces}
+        new_obs_space["observation"] = update_obs_space
+        new_obs_space = gym.spaces.Dict(new_obs_space)
+    else:
+        new_obs_space = update_obs_space
+    return new_obs_space
+
+
+class StackHelper:
+    """
+    A helper for stacking observations.
+    """
+
+    def __init__(self, ob_shape, n_stack, device, n_procs=None):
+        self.input_dim = ob_shape[0]
+        self.n_procs = n_procs
+        self.real_shape = (n_stack * self.input_dim, *ob_shape[1:])
+        if self.n_procs is not None:
+            self.stacked_obs = torch.zeros((n_procs, *self.real_shape))
+            if device is not None:
+                self.stacked_obs = self.stacked_obs.to(device)
+        else:
+            self.stacked_obs = np.zeros(self.real_shape)
+
+    def update_obs(self, obs, dones=None, infos=None):
+        """
+        - obs: torch.tensor
+        """
+        if self.n_procs is not None:
+            self.stacked_obs[:, : -self.input_dim] = self.stacked_obs[
+                :, self.input_dim :
+            ].clone()
+            for (i, new) in enumerate(dones):
+                if new:
+                    self.stacked_obs[i] = 0
+            self.stacked_obs[:, -self.input_dim :] = obs
+
+            # Update info so the final observation frame stack has the final
+            # observation as the final frame in the stack.
+            for i in range(len(infos)):
+                if "final_obs" in infos[i]:
+                    new_final = torch.zeros(*self.stacked_obs.shape[1:])
+                    new_final[:-1] = self.stacked_obs[i][1:]
+                    new_final[-1] = torch.tensor(infos[i]["final_obs"]).to(
+                        self.stacked_obs.device
+                    )
+                    infos[i]["final_obs"] = new_final
+            return self.stacked_obs.clone(), infos
+        else:
+            self.stacked_obs[: -self.input_dim] = self.stacked_obs[
+                self.input_dim :
+            ].copy()
+            self.stacked_obs[-self.input_dim :] = obs
+
+            return self.stacked_obs.copy(), infos
+
+    def reset(self, obs):
+        if self.n_procs is not None:
+            if torch.backends.cudnn.deterministic:
+                self.stacked_obs = torch.zeros(self.stacked_obs.shape)
+            else:
+                self.stacked_obs.zero_()
+            self.stacked_obs[:, -self.input_dim :] = obs
+            return self.stacked_obs.clone()
+        else:
+            self.stacked_obs = np.zeros(self.stacked_obs.shape)
+            self.stacked_obs[-self.input_dim :] = obs
+            return self.stacked_obs.copy()
+
+    def get_shape(self):
+        return self.real_shape
+
+
+def get_size_for_space(action_space: spaces.Space) -> int:
+    if isinstance(action_space, spaces.Discrete):
+        return 1
+    elif isinstance(action_space, spaces.Box):
+        return action_space.shape[0]
+    else:
+        raise ValueError(f"Space {action_space} not supported")
