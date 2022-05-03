@@ -1,0 +1,126 @@
+from dataclasses import dataclass, field
+from typing import Callable, List, Optional, Tuple
+
+import numpy as np
+import torch
+from gym import spaces
+from rl_helper.envs.pointmass.pointmass_env import (PointMassEnv,
+                                                    PointMassParams)
+from rl_helper.envs.registry import full_env_registry
+
+
+@dataclass(frozen=True)
+class PointMassObstacleParams(PointMassParams):
+    """
+    :param custom_reward: Takes as input the current distance to the goal and the previous distance to the goal and returns the reward.
+    :param square_obstacles: A list of obstacles where each obstacle is defined by a tuple with:
+        * x,y position
+        * Obstacle width
+        * Obstacle length
+        * Obstacle rotation angle (in degrees)
+    """
+
+    goal_thresh: float = 0.05
+    custom_reward: Optional[Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] = None
+    square_obstacles: List[Tuple[Tuple[float, float], float, float, float]] = field(
+        default_factory=list
+    )
+
+
+@full_env_registry.register_env("PointMassObstacle-v0")
+class PointMassObstacleEnv(PointMassEnv):
+    def __init__(
+        self,
+        num_processes: int,
+        params: Optional[PointMassParams] = None,
+        device: Optional[torch.device] = None,
+        set_eval: bool = False,
+        obs_space: Optional[spaces.Space] = None,
+        ac_space: Optional[spaces.Space] = None,
+        **kwargs,
+    ):
+        super().__init__(
+            num_processes, params, device, set_eval, obs_space, ac_space, **kwargs
+        )
+        self._circle_obs = []
+        self._square_obs_T = []
+
+        for ob_pos, x_len, y_len, rot in self._params.square_obstacles:
+            rot = rot * (np.pi / 180.0)
+
+            rot_T = torch.FloatTensor(
+                [
+                    [np.cos(rot), -np.sin(rot), 0.0],
+                    [np.sin(rot), np.cos(rot), 0.0],
+                    [0.0, 0.0, 1.0],
+                ]
+            )
+            trans_T = torch.FloatTensor(
+                [
+                    [1.0, 0.0, ob_pos[0]],
+                    [0.0, 1.0, ob_pos[1]],
+                    [0.0, 0.0, 1.0],
+                ]
+            )
+
+            self._square_obs_T.append(
+                (
+                    trans_T @ rot_T,
+                    x_len,
+                    y_len,
+                )
+            )
+
+    def _get_dist(self):
+        return torch.linalg.norm(self._goal - self.cur_pos, dim=-1, keepdims=True)
+
+    def reset(self):
+        obs = super().reset()
+        self._prev_dist = self._get_dist()
+        return obs
+
+    def _add_to_info(self, all_info):
+        dists = self._get_dist()
+        for i in range(self._batch_size):
+            all_info[i]["at_goal"] = dists[i].item() < self._params.goal_thresh
+        return all_info
+
+    def _get_reward(self):
+        cur_dist = self._get_dist()
+        if self._params.custom_reward is None:
+            reward = super()._get_reward()
+        else:
+            reward = self._params.custom_reward(cur_dist, self._prev_dist)
+        self._prev_dist = cur_dist
+        return reward
+
+    def forward(self, cur_pos, action):
+        action = action.to(self._device)
+        action = torch.clamp(action, -1.0, 1.0)
+        new_pos = cur_pos + (action * self._params.dt)
+
+        if self._params.clip_bounds:
+            new_pos = torch.clamp(
+                new_pos, -self._params.position_limit, self._params.position_limit
+            )
+
+        for ob_pos, ob_radius in self._circle_obs:
+            local_pos = new_pos - ob_pos
+            local_dist = torch.linalg.norm(local_pos, dim=-1)
+            coll_idxs = torch.nonzero(local_dist < ob_radius)
+
+            norm_pos = (local_pos / local_dist.view(-1, 1)) * ob_radius
+            adjusted_pos = ob_pos + norm_pos
+            new_pos[coll_idxs] = adjusted_pos[coll_idxs]
+
+        homo_pos = torch.cat([new_pos, torch.ones(new_pos.shape[0], 1)], dim=-1)
+        for obs_T, xlen, ylen in self._square_obs_T:
+            local_pos = torch.linalg.inv(obs_T) @ homo_pos.T
+
+            inside_x = torch.logical_and(local_pos[0] < xlen, local_pos[0] > -xlen)
+            inside_y = torch.logical_and(local_pos[1] < ylen, local_pos[1] > -ylen)
+            inside_box = torch.logical_and(inside_x, inside_y)
+
+            new_pos[inside_box] = cur_pos[inside_box]
+
+        return new_pos

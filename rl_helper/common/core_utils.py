@@ -2,13 +2,48 @@
 Helpers for dealing with vectorized environments.
 """
 
-from collections import OrderedDict
-from typing import Any, Dict
+import random
+from collections import OrderedDict, defaultdict
+from typing import Any, Dict, List
 
 import gym
 import gym.spaces as spaces
 import numpy as np
 import torch
+
+
+def set_seed(seed: int) -> None:
+    """
+    Sets the seed for numpy, python random, and pytorch.
+    """
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+
+def group_trajectories(
+    dones: torch.Tensor, **other_data: Dict[str, torch.Tensor]
+) -> List[Dict[str, torch.Tensor]]:
+    """
+    :param dones: An (N, 1) tensor
+    """
+    for k, v in other_data.items():
+        if v.size(0) != dones.size(0):
+            raise ValueError(
+                f"Key {k} is improper shape {v.shape} for dones of shape {dones.shape}"
+            )
+
+    trajs = []
+    cur_traj = defaultdict(list)
+    for i, done in enumerate(dones):
+        for k, v in other_data.items():
+            cur_traj[k].append(v[i])
+        if done:
+            trajs.append({k: torch.stack(v, dim=0) for k, v in cur_traj.items()})
+            cur_traj = defaultdict(list)
+    return trajs
 
 
 def compress_dict(d: Dict[str, Any], pre="") -> Dict[str, Any]:
@@ -177,10 +212,13 @@ class StackHelper:
         return self.real_shape
 
 
-def get_size_for_space(action_space: spaces.Space) -> int:
-    if isinstance(action_space, spaces.Discrete):
+def get_size_for_space(space: spaces.Space) -> int:
+    """
+    Returns the number of dimensions to represent a Gym space. If the space is discrete, this requires only 1 dimension.
+    """
+    if isinstance(space, spaces.Discrete):
         return 1
-    elif isinstance(action_space, spaces.Box):
-        return action_space.shape[0]
+    elif isinstance(space, spaces.Box):
+        return space.shape[0]
     else:
-        raise ValueError(f"Space {action_space} not supported")
+        raise ValueError(f"Space {space} not supported")

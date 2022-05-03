@@ -3,7 +3,7 @@ from typing import Any, Callable, Dict, Optional
 
 import gym
 import torch
-from rl_helper.envs.pointmass import pointmass_env
+from rl_helper.envs.pointmass import pointmass_env, pointmass_obstacle
 from rl_helper.envs.registry import full_env_registry
 from rl_helper.envs.vec_env.dummy_vec_env import DummyVecEnv
 from rl_helper.envs.vec_env.shmem_vec_env import ShmemVecEnv
@@ -16,9 +16,9 @@ from rl_helper.envs.wrappers import (TimeLimitMask, VecPyTorch,
 def create_vectorized_envs(
     env_id: str,
     num_processes: int,
+    seed: int,
     *,
     device: Optional[torch.device] = None,
-    seed: int = 0,
     context_mode: str = "spawn",
     create_env_fn: Optional[Callable[[int], None]] = None,
     force_multi_proc: bool = False,

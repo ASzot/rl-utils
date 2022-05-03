@@ -17,8 +17,15 @@ class DictDataset(Dataset):
             raise ValueError("Tensors to dataset are not of the same shape")
         self._dataset_len = tensor_sizes[0]
 
-    def __getitem__(self, idx):
+    @property
+    def all_data(self):
+        return self._load_data
+
+    def get_data(self, k: str) -> torch.Tensor:
+        return self._load_data[k]
+
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         return {k: v[idx] for k, v in self._load_data.items()}
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self._dataset_len

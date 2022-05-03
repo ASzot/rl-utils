@@ -25,6 +25,7 @@ class Evaluator:
         vid_dir: str,
         fps: int,
         save_traj_name: Optional[str] = None,
+        **kwargs,
     ):
         """
         :param save_traj_name: The full file path (for example "data/trajs/data.pth") to save the evaluated trajectories to.
@@ -64,11 +65,19 @@ class Evaluator:
         self._all_traj_done.extend(self._save_trajs_done[env_i])
         self._all_traj_info.extend(self._save_trajs_info[env_i])
 
-        self._save_trajs_obs = defaultdict(list)
-        self._save_trajs_actions = defaultdict(list)
-        self._save_trajs_rewards = defaultdict(list)
-        self._save_trajs_done = defaultdict(list)
-        self._save_trajs_info = defaultdict(list)
+        self._save_trajs_obs[env_i].clear()
+        self._save_trajs_actions[env_i].clear()
+        self._save_trajs_rewards[env_i].clear()
+        self._save_trajs_done[env_i].clear()
+        self._save_trajs_info[env_i].clear()
+
+    @property
+    def eval_trajs_obs(self):
+        return self._all_traj_obs
+
+    @property
+    def eval_trajs_dones(self):
+        return self._all_traj_done
 
     def _save_trajs(self):
         assert self._save_traj_name is not None
@@ -142,16 +151,14 @@ class Evaluator:
                 all_frames.append(frames)
 
             for env_i in range(num_envs):
-                if self._should_save_trajs:
-                    self._add_transition_to_save(
-                        env_i, obs, act_data["action"], rewards, done, info
-                    )
+                self._add_transition_to_save(
+                    env_i, obs, act_data["action"], rewards, done, info
+                )
 
                 if done[env_i]:
                     total_evaluated += 1
                     if num_evals[env_i] > 0:
-                        if self._should_save_trajs:
-                            self._flush_trajectory_to_save(env_i)
+                        self._flush_trajectory_to_save(env_i)
                         for k, v in compress_and_filter_dict(info[env_i]).items():
                             accum_stats[k].append(v)
                         num_evals[env_i] -= 1
