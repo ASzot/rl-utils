@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 from rl_helper.common.core_utils import compress_and_filter_dict
 from rl_helper.common.viz_utils import save_mp4
-from rl_helper.envs import VecEnv
+from rl_helper.envs.vec_env.vec_env import VecEnv
 from rl_helper.templates import BasePolicy
 
 

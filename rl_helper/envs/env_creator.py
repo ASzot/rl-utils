@@ -16,7 +16,7 @@ from rl_helper.envs.wrappers import (TimeLimitMask, VecPyTorch,
 def create_vectorized_envs(
     env_id: str,
     num_processes: int,
-    seed: int,
+    seed: int = 0,
     *,
     device: Optional[torch.device] = None,
     context_mode: str = "spawn",

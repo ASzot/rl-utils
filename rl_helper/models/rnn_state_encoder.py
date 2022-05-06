@@ -4,6 +4,10 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+"""
+Code is from https://github.com/facebookresearch/habitat-lab/blob/main/habitat_baselines/rl/models/rnn_state_encoder.py
+"""
+
 from typing import Tuple
 
 import torch

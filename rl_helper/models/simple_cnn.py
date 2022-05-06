@@ -1,3 +1,7 @@
+"""
+Code is from https://github.com/facebookresearch/habitat-lab/blob/main/habitat_baselines/rl/models/simple_cnn.py
+"""
+
 from typing import Dict, List, Optional, Union
 
 import gym.spaces as spaces
