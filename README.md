@@ -9,3 +9,5 @@ A library of useful components for RL research.
 Install from source for development: 
 * Clone this repository `git clone https://github.com/ASzot/rl-helper.git`
 * `pip install -e .`
+
+# Environments

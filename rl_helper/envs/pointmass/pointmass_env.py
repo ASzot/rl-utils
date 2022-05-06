@@ -13,6 +13,14 @@ from torch.distributions import Uniform
 
 @dataclass(frozen=True)
 class PointMassParams:
+    """
+    :param force_eval_start_dist: Generate the start positions from the eval offset.
+    :param force_train_start_dist: Generate the start positions from the train offset.
+    :param clip_bounds: Clip the agent to be within [-position_limit, position_limit]^2 ?
+    :param clip_actions: Clip the actions to be within -1 to 1.
+    :param ep_horizon: The length of the episode.
+    """
+
     force_eval_start_dist: bool = False
     force_train_start_dist: bool = True
     clip_bounds: bool = True

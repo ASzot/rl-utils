@@ -15,7 +15,7 @@ from rl_helper.envs.wrappers import (TimeLimitMask, VecPyTorch,
 
 def create_vectorized_envs(
     env_id: str,
-    num_processes: int,
+    num_envs: int,
     seed: int = 0,
     *,
     device: Optional[torch.device] = None,
@@ -28,7 +28,7 @@ def create_vectorized_envs(
     found_full_env_cls = full_env_registry.search_env(env_id)
     if found_full_env_cls is not None:
         # print(f"Found {found_full_env_cls} for env {env_id}")
-        return found_full_env_cls(num_processes=num_processes, seed=seed, **kwargs)
+        return found_full_env_cls(num_envs=num_envs, seed=seed, **kwargs)
 
     def full_create_env(rank):
         full_seed = seed + rank
@@ -43,9 +43,9 @@ def create_vectorized_envs(
             env.action_space.seed(full_seed)
         return env
 
-    envs = [partial(full_create_env, rank=i) for i in range(num_processes)]
+    envs = [partial(full_create_env, rank=i) for i in range(num_envs)]
 
-    if num_processes > 1 or force_multi_proc:
+    if num_envs > 1 or force_multi_proc:
         envs = ShmemVecEnv(envs, context=context_mode)
     else:
         envs = DummyVecEnv(envs)
