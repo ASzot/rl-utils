@@ -38,8 +38,7 @@ class PointMassEnv(VecEnv):
         params: Optional[PointMassParams] = None,
         device: Optional[torch.device] = None,
         set_eval: bool = False,
-        obs_space: Optional[spaces.Space] = None,
-        ac_space: Optional[spaces.Space] = None,
+        seed: Optional[int] = None,
         **kwargs,
     ):
         if params is None:
@@ -54,11 +53,8 @@ class PointMassEnv(VecEnv):
         self._ep_step = 0
 
         self._ep_rewards = []
-        if obs_space is None:
-            obs_space = spaces.Box(low=-1.0, high=1.0, shape=(2,))
-
-        if ac_space is None:
-            ac_space = spaces.Box(low=-1.0, high=1.0, shape=(2,))
+        obs_space = spaces.Box(low=-1.0, high=1.0, shape=(2,), seed=seed)
+        ac_space = spaces.Box(low=-1.0, high=1.0, shape=(2,), seed=seed)
 
         self._is_eval = set_eval or self._params.force_eval_start_dist
         if self._params.force_train_start_dist:
