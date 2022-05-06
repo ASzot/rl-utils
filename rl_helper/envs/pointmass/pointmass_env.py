@@ -42,7 +42,7 @@ class PointMassParams:
 class PointMassEnv(VecEnv):
     def __init__(
         self,
-        num_processes: int,
+        num_envs: int,
         params: Optional[PointMassParams] = None,
         device: Optional[torch.device] = None,
         set_eval: bool = False,
@@ -53,7 +53,7 @@ class PointMassEnv(VecEnv):
             params = PointMassParams()
         if device is None:
             device = torch.device("cpu")
-        self._batch_size = num_processes
+        self._batch_size = num_envs
         self._params = params
 
         self._device = device

@@ -11,3 +11,4 @@ Install from source for development:
 * `pip install -e .`
 
 # Environments
+* [Point Mass Navigation](https://github.com/ASzot/rl-helper/tree/main/rl_helper/envs/pointmass): A 2D point navigates to the goal.

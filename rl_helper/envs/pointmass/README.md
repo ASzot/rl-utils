@@ -29,6 +29,10 @@ Change default arguments.
 from rl_helper.envs import create_vectorized_envs
 from rl_helper.envs.pointmass import PointMassObstacleParams
 envs = create_vectorized_envs(
-    "PointMass-v0", num_envs=32, params=PointMassObstacleParams(dt=0.1, ep_horizon=10, square_obstacles=[[0.5, 0.5], 0.11, 0.5, 45.0])
+    "PointMassObstacle-v0",
+    num_envs=32,
+    params=PointMassObstacleParams(
+        dt=0.1, ep_horizon=10, square_obstacles=[([0.5, 0.5], 0.11, 0.5, 45.0)]
+    ),
 )
 ```

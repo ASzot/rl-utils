@@ -31,14 +31,16 @@ class PointMassObstacleParams(PointMassParams):
 class PointMassObstacleEnv(PointMassEnv):
     def __init__(
         self,
-        num_processes: int,
-        params: Optional[PointMassParams] = None,
+        num_envs: int,
+        params: Optional[PointMassObstacleParams] = None,
         device: Optional[torch.device] = None,
         set_eval: bool = False,
         seed: Optional[int] = None,
         **kwargs,
     ):
-        super().__init__(num_processes, params, device, set_eval, seed, **kwargs)
+        if params is None:
+            params = PointMassObstacleParams()
+        super().__init__(num_envs, params, device, set_eval, seed, **kwargs)
         self._circle_obs = []
         self._square_obs_T = []
 
