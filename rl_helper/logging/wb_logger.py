@@ -66,7 +66,6 @@ class WbLogger(Logger):
             group_id = "-".join([*parts[:2], *parts[4:]])
         else:
             group_id = None
-        breakpoint()
 
         self.run = wandb.init(
             project=self.wb_proj_name,
