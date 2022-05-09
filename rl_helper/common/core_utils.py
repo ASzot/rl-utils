@@ -53,7 +53,7 @@ def compress_dict(d: Dict[str, Any], pre="") -> Dict[str, Any]:
     ret_d = {}
     for k, v in d.items():
         if isinstance(v, dict):
-            ret_d.update(compress_dict(v, f"{k}."))
+            ret_d.update(compress_dict(v, f"{pre}{k}."))
         else:
             ret_d[pre + k] = str(v)
     return ret_d

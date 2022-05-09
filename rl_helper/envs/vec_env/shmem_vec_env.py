@@ -10,7 +10,8 @@ import numpy as np
 from rl_helper.common.core_utils import (dict_to_obs, obs_space_info,
                                          obs_to_dict)
 
-from .vec_env import CloudpickleWrapper, VecEnv, clear_mpi_env_vars
+from .vec_env import (FINAL_OBS_KEY, CloudpickleWrapper, VecEnv,
+                      clear_mpi_env_vars)
 
 _NP_TO_CT = {
     np.float32: ctypes.c_float,
@@ -171,7 +172,7 @@ def _subproc_worker(
                     final_obs = obs
                     if isinstance(obs, dict):
                         final_obs = obs["observation"]
-                    info["final_obs"] = final_obs
+                    info[FINAL_OBS_KEY] = final_obs
                     obs = env.reset()
                 pipe.send((_write_obs(obs), reward, done, info))
             elif cmd == "render":

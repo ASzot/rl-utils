@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 from functools import wraps
-from typing import Optional
+from typing import Callable, Optional
 
 import gym
 import numpy as np
 import torch
 from gym import spaces
 from rl_helper.envs.registry import full_env_registry
-from rl_helper.envs.vec_env.vec_env import VecEnv
+from rl_helper.envs.vec_env.vec_env import FINAL_OBS_KEY, VecEnv
 from torch.distributions import Uniform
 
 
@@ -19,6 +19,9 @@ class PointMassParams:
     :param clip_bounds: Clip the agent to be within [-position_limit, position_limit]^2 ?
     :param clip_actions: Clip the actions to be within -1 to 1.
     :param ep_horizon: The length of the episode.
+    :param custom_reward: A function that takes as input the current distance
+        and the previous distance and outputs a reward value. All are PyTorch
+        tensors of shape (N,) where N is the number of environments.
     """
 
     force_eval_start_dist: bool = False
@@ -36,6 +39,7 @@ class PointMassParams:
     train_offset: float = np.pi / 4
     position_limit: float = 1.5
     transition_noise: float = 0.0
+    custom_reward: Optional[Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] = None
 
 
 @full_env_registry.register_env("PointMass-v0")
@@ -136,7 +140,7 @@ class PointMassEnv(VecEnv):
                 all_info[i]["episode"] = {
                     "r": torch.stack(self._ep_rewards).sum(0)[i].item()
                 }
-                all_info[i]["final_obs"] = final_obs[i]
+                all_info[i][FINAL_OBS_KEY] = final_obs[i]
             self.reset()
 
         return (self._get_obs(), reward, all_is_done, all_info)
@@ -180,12 +184,21 @@ class PointMassEnv(VecEnv):
     def _add_to_info(self, all_info):
         return all_info
 
-    def _get_reward(self):
-        dist_to_goal = torch.linalg.norm(
-            self._goal - self.cur_pos, dim=-1, keepdims=True
-        )
+    def _get_dist(self):
+        return torch.linalg.norm(self._goal - self.cur_pos, dim=-1, keepdims=True)
 
-        return -self._params.reward_dist_pen * dist_to_goal
+    def _get_reward(self):
+        cur_dist = self._get_dist()
+        if self._params.custom_reward is None:
+            dist_to_goal = torch.linalg.norm(
+                self._goal - self.cur_pos, dim=-1, keepdims=True
+            )
+
+            reward = -self._params.reward_dist_pen * dist_to_goal
+        else:
+            reward = self._params.custom_reward(cur_dist, self._prev_dist)
+        self._prev_dist = cur_dist
+        return reward
 
     def get_regions(self, offset, spread):
         inc = np.pi / 2
@@ -225,6 +238,7 @@ class PointMassEnv(VecEnv):
         self.cur_pos = self._sample_start(self._batch_size, self._goal)
         self._ep_step = 0
         self._ep_rewards = []
+        self._prev_dist = self._get_dist()
 
         return self._get_obs()
 

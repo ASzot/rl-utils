@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -21,7 +21,6 @@ class PointMassObstacleParams(PointMassParams):
     """
 
     goal_thresh: float = 0.05
-    custom_reward: Optional[Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] = None
     square_obstacles: List[Tuple[Tuple[float, float], float, float, float]] = field(
         default_factory=list
     )
@@ -70,28 +69,11 @@ class PointMassObstacleEnv(PointMassEnv):
                 )
             )
 
-    def _get_dist(self):
-        return torch.linalg.norm(self._goal - self.cur_pos, dim=-1, keepdims=True)
-
-    def reset(self):
-        obs = super().reset()
-        self._prev_dist = self._get_dist()
-        return obs
-
     def _add_to_info(self, all_info):
         dists = self._get_dist()
         for i in range(self._batch_size):
             all_info[i]["at_goal"] = dists[i].item() < self._params.goal_thresh
         return all_info
-
-    def _get_reward(self):
-        cur_dist = self._get_dist()
-        if self._params.custom_reward is None:
-            reward = super()._get_reward()
-        else:
-            reward = self._params.custom_reward(cur_dist, self._prev_dist)
-        self._prev_dist = cur_dist
-        return reward
 
     def forward(self, cur_pos, action):
         action = action.to(self._device)

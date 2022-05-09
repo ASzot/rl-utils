@@ -26,7 +26,9 @@ class Logger:
         smooth_len: int,
         full_cfg: Dict[str, Any],
     ):
-        self.is_debug_mode = run_name == "debug"
+        """
+        :param run_name: If empty string then a run name will be auto generated.
+        """
         self._create_run_name(run_name, seed)
 
         self.log_dir = log_dir
@@ -72,16 +74,21 @@ class Logger:
                 for k, v in flat_inf.items():
                     self._step_log_info[k].append(v)
 
-    def collect_infos(self, info: Dict[str, float], prefix: str = "") -> None:
+    def collect_infos(
+        self, info: Dict[str, float], prefix: str = "", no_rolling_window: bool = False
+    ) -> None:
         for k, v in info.items():
-            self.collect_info(k, v, prefix)
+            self.collect_info(k, v, prefix, no_rolling_window)
 
-    def collect_info(self, k: str, value: float, prefix: str = "") -> None:
+    def collect_info(
+        self, k: str, value: float, prefix: str = "", no_rolling_window: bool = False
+    ) -> None:
+        if no_rolling_window:
+            self._step_log_info[prefix + k].clear()
         self._step_log_info[prefix + k].append(value)
 
     def _create_run_name(self, run_name, seed):
-        assert run_name is not None and run_name != "", "Must specify a prefix"
-        if run_name != "debug":
+        if run_name == "":
             d = datetime.datetime.today()
             date_id = "%i%i" % (d.month, d.day)
 
@@ -92,7 +99,7 @@ class Logger:
             rnd_id = np.random.RandomState().choice(chars, 6)
             rnd_id = "".join(rnd_id)
 
-            self.run_name = f"{date_id}-{seed}-{rnd_id}-{run_name}"
+            self.run_name = f"{date_id}-{seed}-{rnd_id}"
         else:
             self.run_name = run_name
         print(f"Assigning full prefix {self.run_name}")
