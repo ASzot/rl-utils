@@ -46,19 +46,23 @@ class PointMassObstacleEnv(PointMassEnv):
         for ob_pos, x_len, y_len, rot in self._params.square_obstacles:
             rot = rot * (np.pi / 180.0)
 
-            rot_T = torch.FloatTensor(
+            rot_T = torch.tensor(
                 [
                     [np.cos(rot), -np.sin(rot), 0.0],
                     [np.sin(rot), np.cos(rot), 0.0],
                     [0.0, 0.0, 1.0],
-                ]
+                ],
+                device=self._device,
+                dtype=torch.float,
             )
-            trans_T = torch.FloatTensor(
+            trans_T = torch.tensor(
                 [
                     [1.0, 0.0, ob_pos[0]],
                     [0.0, 1.0, ob_pos[1]],
                     [0.0, 0.0, 1.0],
-                ]
+                ],
+                device=self._device,
+                dtype=torch.float,
             )
 
             self._square_obs_T.append(
@@ -94,7 +98,9 @@ class PointMassObstacleEnv(PointMassEnv):
             adjusted_pos = ob_pos + norm_pos
             new_pos[coll_idxs] = adjusted_pos[coll_idxs]
 
-        homo_pos = torch.cat([new_pos, torch.ones(new_pos.shape[0], 1)], dim=-1)
+        homo_pos = torch.cat(
+            [new_pos, torch.ones(new_pos.shape[0], 1, device=self._device)], dim=-1
+        )
         for obs_T, xlen, ylen in self._square_obs_T:
             local_pos = torch.linalg.inv(obs_T) @ homo_pos.T
 

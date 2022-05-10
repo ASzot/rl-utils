@@ -28,7 +28,7 @@ def create_vectorized_envs(
     found_full_env_cls = full_env_registry.search_env(env_id)
     if found_full_env_cls is not None:
         # print(f"Found {found_full_env_cls} for env {env_id}")
-        return found_full_env_cls(num_envs=num_envs, seed=seed, **kwargs)
+        return found_full_env_cls(num_envs=num_envs, seed=seed, device=device, **kwargs)
 
     def full_create_env(rank):
         full_seed = seed + rank
