@@ -9,6 +9,7 @@ import torch.nn as nn
 from rl_helper.common.core_utils import compress_and_filter_dict
 from rl_helper.common.viz_utils import save_mp4
 from rl_helper.envs.vec_env.vec_env import VecEnv
+from rl_helper.logging import Logger
 from rl_helper.templates import BasePolicy
 
 
@@ -114,7 +115,7 @@ class Evaluator:
         self._clear_save_trajs()
 
     def evaluate(
-        self, policy: BasePolicy, num_episodes: int, eval_i: int
+        self, policy: BasePolicy, num_episodes: int, eval_i: int, logger: Logger
     ) -> Dict[str, float]:
         self._clear_save_trajs()
 

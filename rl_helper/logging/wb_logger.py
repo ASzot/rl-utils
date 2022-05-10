@@ -11,7 +11,9 @@ from collections import defaultdict, deque
 from typing import Any, Dict
 
 import numpy as np
-from rl_helper.logging.base_logger import Logger
+from omegaconf import DictConfig, OmegaConf
+from rl_helper.common import compress_dict
+from rl_helper.logging.base_logger import Logger, LoggerCfgType
 from six.moves import shlex_quote
 
 try:
@@ -35,7 +37,7 @@ class WbLogger(Logger):
         vid_dir: str,
         save_dir: str,
         smooth_len: int,
-        full_cfg: Dict[str, Any],
+        full_cfg: LoggerCfgType,
         **kwargs,
     ):
         if wandb is None:
@@ -66,6 +68,8 @@ class WbLogger(Logger):
             group_id = "-".join([*parts[:2], *parts[4:]])
         else:
             group_id = None
+        if isinstance(full_cfg, DictConfig):
+            full_cfg = OmegaConf.to_container(full_cfg, resolve=True)
 
         self.run = wandb.init(
             project=self.wb_proj_name,
@@ -73,17 +77,11 @@ class WbLogger(Logger):
             entity=self.wb_entity,
             group=group_id,
             config=full_cfg,
-            reinit=True,
         )
         return wandb
 
-    def log_args(self, args):
-        wandb.config.update(args)
-
-    def log_video(self, video_file, step_count, fps):
-        if not self.should_log_vids:
-            return
-        wandb.log({"video": wandb.Video(video_file + ".mp4", fps=fps)}, step=step_count)
+    def collect_img(self, k: str, img_path: str, prefix: str = ""):
+        self._step_log_info[prefix + k] = wandb.Image(img_path)
 
     def close(self):
         self.run.finish()

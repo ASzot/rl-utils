@@ -7,12 +7,15 @@ import string
 import sys
 import time
 from collections import defaultdict, deque
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 import numpy as np
 import torch.nn as nn
+from omegaconf import DictConfig
 from rl_helper.common.core_utils import compress_and_filter_dict
 from six.moves import shlex_quote
+
+LoggerCfgType = Union[Dict[str, Any], DictConfig]
 
 
 class Logger:
@@ -24,7 +27,7 @@ class Logger:
         vid_dir: str,
         save_dir: str,
         smooth_len: int,
-        full_cfg: Dict[str, Any],
+        full_cfg: LoggerCfgType,
     ):
         """
         :param run_name: If empty string then a run name will be auto generated.
@@ -110,10 +113,11 @@ class Logger:
         """
         pass
 
-    def log_args(self, args):
-        pass
-
-    def log_video(self, video_file, step_count, fps):
+    def collect_img(self, k: str, img_path: str, prefix: str = ""):
+        """
+        Log an image
+        :param img_path: Full path to the image.
+        """
         pass
 
     def watch_model(self, model: nn.Module):
@@ -137,8 +141,15 @@ class Logger:
         rewards = self._step_log_info.get("episode.reward", [0])
 
         log_dat = {}
+        remove_keys = []
         for k, v in self._step_log_info.items():
-            log_dat[k] = np.mean(v)
+            if isinstance(v, deque):
+                log_dat[k] = np.mean(v)
+            else:
+                remove_keys.append(k)
+                log_dat[k] = v
+        for k in remove_keys:
+            del self._step_log_info[k]
 
         if self.is_printing:
             print("")

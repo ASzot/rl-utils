@@ -46,14 +46,14 @@ def group_trajectories(
     return trajs
 
 
-def compress_dict(d: Dict[str, Any], pre="") -> Dict[str, Any]:
+def compress_dict(d: Dict[str, Any], pre="", sep=".") -> Dict[str, Any]:
     """
     Compresses a dictionary to only have one "level"
     """
     ret_d = {}
     for k, v in d.items():
         if isinstance(v, dict):
-            ret_d.update(compress_dict(v, f"{pre}{k}."))
+            ret_d.update(compress_dict(v, f"{pre}{k}{sep}"))
         else:
             ret_d[pre + k] = str(v)
     return ret_d
