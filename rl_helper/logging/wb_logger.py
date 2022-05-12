@@ -38,8 +38,13 @@ class WbLogger(Logger):
         save_dir: str,
         smooth_len: int,
         full_cfg: LoggerCfgType,
+        group_name: str = "",
         **kwargs,
     ):
+        """
+        :parameter run_name: If empty string then a random run name is assigned.
+        :parameter group_name: If empty string then no group name is used.
+        """
         if wandb is None:
             raise ImportError("Wandb is not installed")
 
@@ -53,7 +58,7 @@ class WbLogger(Logger):
 
         self.wb_proj_name = wb_proj_name
         self.wb_entity = wb_entity
-        self.wandb = self._create_wandb(full_cfg)
+        self.wandb = self._create_wandb(full_cfg, group_name)
 
     def log_vals(self, key_vals, step_count):
         wandb.log(key_vals, step=int(step_count))
@@ -61,13 +66,9 @@ class WbLogger(Logger):
     def watch_model(self, model):
         wandb.watch(model)
 
-    def _create_wandb(self, full_cfg):
-        if self.run_name.count("-") >= 4:
-            # Remove the seed and random ID info.
-            parts = self.run_name.split("-")
-            group_id = "-".join([*parts[:2], *parts[4:]])
-        else:
-            group_id = None
+    def _create_wandb(self, full_cfg: LoggerCfgType, group_name: str):
+        if group_name == "":
+            group_name = None
         if isinstance(full_cfg, DictConfig):
             full_cfg = OmegaConf.to_container(full_cfg, resolve=True)
 
@@ -75,7 +76,7 @@ class WbLogger(Logger):
             project=self.wb_proj_name,
             name=self.run_name,
             entity=self.wb_entity,
-            group=group_id,
+            group=group_name,
             config=full_cfg,
         )
         return wandb

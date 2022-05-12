@@ -19,8 +19,8 @@ class PointMassParams:
     :param clip_bounds: Clip the agent to be within [-position_limit, position_limit]^2 ?
     :param clip_actions: Clip the actions to be within -1 to 1.
     :param ep_horizon: The length of the episode.
-    :param custom_reward: A function that takes as input the current distance
-        and the previous distance and outputs a reward value. All are PyTorch
+    :param custom_reward: A function that takes as input the current position,
+        previous position, and action  and outputs a reward value. All are PyTorch
         tensors of shape (N,) where N is the number of environments.
     """
 
@@ -39,7 +39,9 @@ class PointMassParams:
     train_offset: float = np.pi / 4
     position_limit: float = 1.5
     transition_noise: float = 0.0
-    custom_reward: Optional[Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] = None
+    custom_reward: Optional[
+        Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
+    ] = None
 
 
 @full_env_registry.register_env("PointMass-v0")
@@ -117,9 +119,10 @@ class PointMassEnv(VecEnv):
     def step(self, action):
         self.cur_pos = self.forward(self.cur_pos, action)
         self._ep_step += 1
+        self._store_actions.append(action)
 
         is_done = self._ep_step >= self._params.ep_horizon
-        reward = self._get_reward()
+        reward = self._get_reward(action)
         self._ep_rewards.append(reward)
 
         all_is_done = torch.tensor(
@@ -135,10 +138,14 @@ class PointMassEnv(VecEnv):
         all_info = self._add_to_info(all_info)
 
         if is_done:
+            store_actions = torch.stack(self._store_actions, dim=1)
+            action_magnitudes = torch.linalg.norm(store_actions, dim=-1)
             final_obs = self._get_obs()
             for i in range(self._batch_size):
                 all_info[i]["episode"] = {
-                    "r": torch.stack(self._ep_rewards).sum(0)[i].item()
+                    "r": torch.stack(self._ep_rewards).sum(0)[i].item(),
+                    "max_action_magnitude": action_magnitudes[i].max().item(),
+                    "avg_action_magnitude": action_magnitudes[i].mean().item(),
                 }
                 all_info[i][FINAL_OBS_KEY] = final_obs[i]
             self.reset()
@@ -187,8 +194,7 @@ class PointMassEnv(VecEnv):
     def _get_dist(self):
         return torch.linalg.norm(self._goal - self.cur_pos, dim=-1, keepdims=True)
 
-    def _get_reward(self):
-        cur_dist = self._get_dist()
+    def _get_reward(self, action):
         if self._params.custom_reward is None:
             dist_to_goal = torch.linalg.norm(
                 self._goal - self.cur_pos, dim=-1, keepdims=True
@@ -196,8 +202,8 @@ class PointMassEnv(VecEnv):
 
             reward = -self._params.reward_dist_pen * dist_to_goal
         else:
-            reward = self._params.custom_reward(cur_dist, self._prev_dist)
-        self._prev_dist = cur_dist
+            reward = self._params.custom_reward(self.cur_pos, self._prev_pos, action)
+        self._prev_pos = self.cur_pos.detach().clone()
         return reward
 
     def get_regions(self, offset, spread):
@@ -238,7 +244,8 @@ class PointMassEnv(VecEnv):
         self.cur_pos = self._sample_start(self._batch_size, self._goal)
         self._ep_step = 0
         self._ep_rewards = []
-        self._prev_dist = self._get_dist()
+        self._prev_pos = self.cur_pos.detach().clone()
+        self._store_actions = []
 
         return self._get_obs()
 

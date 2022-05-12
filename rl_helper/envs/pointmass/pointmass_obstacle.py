@@ -12,7 +12,6 @@ from rl_helper.envs.registry import full_env_registry
 @dataclass(frozen=True)
 class PointMassObstacleParams(PointMassParams):
     """
-    :param custom_reward: Takes as input the current distance to the goal and the previous distance to the goal and returns the reward.
     :param square_obstacles: A list of obstacles where each obstacle is defined by a tuple with:
         * x,y position
         * Obstacle width
