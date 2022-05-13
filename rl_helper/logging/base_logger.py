@@ -90,6 +90,13 @@ class Logger:
             self._step_log_info[prefix + k].clear()
         self._step_log_info[prefix + k].append(value)
 
+    def collect_info_list(self, k: str, values: List[float], prefix: str = "") -> None:
+        """
+        Collect a list of values for a key.
+        """
+        for v in values:
+            self.collect_info(k, v)
+
     def _create_run_name(self, run_name, seed):
         if run_name == "":
             d = datetime.datetime.today()

@@ -81,10 +81,10 @@ class Evaluator:
 
     def _save_trajs(self):
         assert self._save_traj_name is not None
-        obs = torch.stack(self._all_traj_obs, dim=0)
-        actions = torch.stack(self._all_traj_actions, dim=0)
-        rewards = torch.stack(self._all_traj_rewards, dim=0)
-        terminals = torch.stack(self._all_traj_done, dim=0)
+        obs = torch.stack(self._all_traj_obs, dim=0).detach()
+        actions = torch.stack(self._all_traj_actions, dim=0).detach()
+        rewards = torch.stack(self._all_traj_rewards, dim=0).detach()
+        terminals = torch.stack(self._all_traj_done, dim=0).detach()
 
         num_steps = obs.shape[0]
         assert (
