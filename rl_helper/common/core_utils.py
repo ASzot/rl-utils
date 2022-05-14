@@ -2,7 +2,12 @@
 Helpers for dealing with vectorized environments.
 """
 
+import hashlib
+import os
+import os.path as osp
+import pickle
 import random
+import time
 from collections import OrderedDict, defaultdict
 from typing import Any, Dict, List
 
@@ -222,3 +227,46 @@ def get_size_for_space(space: spaces.Space) -> int:
         return space.shape[0]
     else:
         raise ValueError(f"Space {space} not supported")
+
+
+class CacheHelper:
+    CACHE_PATH = "./data/cache"
+
+    def __init__(self, cache_name, lookup_val, def_val=None, verbose=False, rel_dir=""):
+        self.use_cache_path = osp.join(CacheHelper.CACHE_PATH, rel_dir)
+        if not osp.exists(self.use_cache_path):
+            os.makedirs(self.use_cache_path)
+        sec_hash = hashlib.md5(str(lookup_val).encode("utf-8")).hexdigest()
+        cache_id = f"{cache_name}_{sec_hash}.pickle"
+        self.cache_id = osp.join(self.use_cache_path, cache_id)
+        self.def_val = def_val
+        self.verbose = verbose
+
+    def exists(self):
+        return osp.exists(self.cache_id)
+
+    def load(self, load_depth=0):
+        if self.exists():
+            try:
+                with open(self.cache_id, "rb") as f:
+                    if self.verbose:
+                        print("Loading cache @", self.cache_id)
+                    return pickle.load(f)
+            except EOFError as e:
+                if load_depth == 32:
+                    raise e
+                # try again soon
+                print(
+                    "Cache size is ", osp.getsize(self.cache_id), "for ", self.cache_id
+                )
+                time.sleep(1.0 + np.random.uniform(0.0, 1.0))
+                return self.load(load_depth + 1)
+            return self.def_val
+        else:
+            return self.def_val
+
+    def save(self, val):
+        with open(self.cache_id, "wb") as f:
+            if self.verbose:
+                print("Saving cache @", self.cache_id)
+            pickle.dump(val, f)

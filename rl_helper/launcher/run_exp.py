@@ -10,11 +10,13 @@ import sys
 import time
 import uuid
 
-import libtmux
+try:
+    import libtmux
+except:
+    libtmux = None
 import numpy as np
-from rlf.args import str2bool
-from rlf.exp_mgr.wb_data_mgr import get_run_params
-from rlf.exp_mgr.wb_query import query_s
+from omegaconf import OmegaConf
+from rl_helper.launcher.wb_query import query_s
 
 RUNS_DIR = "data/log/runs"
 
@@ -29,9 +31,6 @@ def get_arg_parser():
     )
     parser.add_argument(
         "--sess-name", default=None, type=str, help="tmux session name to connect to"
-    )
-    parser.add_argument(
-        "--cmd", type=str, required=True, help="list of commands to run"
     )
     parser.add_argument("--proj-dat", type=str, default=None)
     parser.add_argument(
@@ -52,7 +51,7 @@ def get_arg_parser():
             CUDA_VISIBLE_DEVICES at all.
             """,
     )
-    parser.add_argument("--cfg", type=str, default="./config.yaml")
+    parser.add_argument("--cfg", type=str, default=None)
 
     # MULTIPROC OPTIONS
     parser.add_argument("--mp-offset", type=int, default=0)
@@ -60,7 +59,6 @@ def get_arg_parser():
 
     # SLURM OPTIONS
     parser.add_argument("--comment", type=str, default=None)
-    parser.add_argument("--inject-slurm-id", type=str2bool, default=True)
     parser.add_argument(
         "--slurm-no-batch",
         action="store_true",
@@ -126,37 +124,28 @@ def add_on_args(spec_args):
     return " ".join(spec_args)
 
 
-def get_cmds(cmd_path, spec_args, args):
-    if ".cmd" in cmd_path:
-        open_cmd = osp.join(cmd_path + ".cmd")
-        with open(open_cmd) as f:
+def get_cmds(rest, args):
+    cmd = rest[0]
+    if len(rest) > 1:
+        rest = " ".join(rest[1:])
+    else:
+        rest = ""
+
+    if ".cmd" in cmd:
+        with open(cmd) as f:
             cmds = f.readlines()
     else:
-        cmds = [cmd_path]
+        cmds = [cmd]
 
     cmds = list(filter(lambda x: not (x.startswith("#") or x == "\n"), cmds))
-    cmds = [cmd.rstrip() + " " for cmd in cmds]
+    cmds = [f"{cmd.rstrip()} {rest}" for cmd in cmds]
 
-    # Check if any commands are references to other commands
-    all_ref_cmds = []
-    for i, cmd in enumerate(cmds):
-        if cmd.startswith("R:"):
-            cmd_parts = cmd.split(":")[1].split(" ")
-            ref_cmd_loc = cmd_parts[0]
-            full_ref_cmd_loc = osp.join(config_mgr.get_prop("cmds_loc"), ref_cmd_loc)
-            ref_cmds = get_cmds(
-                full_ref_cmd_loc.rstrip(), [*cmd_parts[1:], *spec_args], args
-            )
-            all_ref_cmds.extend(ref_cmds)
-    cmds = list(filter(lambda x: not x.startswith("R:"), cmds))
-
-    cmds = [cmd + add_on_args(spec_args) for cmd in cmds]
-
-    cmds.extend(all_ref_cmds)
     return cmds
 
 
 def get_tmux_window(sess_name, sess_id):
+    if libtmux is None:
+        raise ValueError("Must install libtmux to use auto tmux capability")
     server = libtmux.Server()
 
     if sess_name is None:
@@ -170,18 +159,6 @@ def get_tmux_window(sess_name, sess_id):
     return sess.new_window(attach=False, window_name="auto_proc")
 
 
-def transform_k(s, use_split, replace_s):
-    prefix_parts = s.split(use_split)
-
-    before_prefix = use_split.join(prefix_parts[:-1])
-    prefix = prefix_parts[-1]
-    parts = prefix.split(" ")
-    prefix = parts[0]
-    after_prefix = " ".join(parts[1:])
-
-    return before_prefix + f"{use_split} {replace_s} " + after_prefix
-
-
 def as_list(x, max_num):
     if isinstance(x, int):
         return [x for _ in range(max_num)]
@@ -191,26 +168,22 @@ def as_list(x, max_num):
     return x
 
 
-def get_cmd_run_str(cmd, args, cd, cmd_idx, num_cmds, slurm_add):
-    env_vars = " ".join(config_mgr.get_prop("add_env_vars", []))
-    if len(env_vars) != 0:
-        env_vars += " "
-    conda_env = config_mgr.get_prop("conda_env")
+def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg):
+    conda_env = proj_cfg["conda_env"]
     python_path = osp.join(osp.expanduser("~"), "miniconda3", "envs", conda_env, "bin")
-    python_path = config_mgr.get_prop("conda_path", def_val=python_path)
+    python_path = proj_cfg.get("conda_path", python_path)
 
     ntasks = as_list(args.ntasks, num_cmds)
     g = as_list(args.g, num_cmds)
     c = as_list(args.c, num_cmds)
 
     if args.st is None:
-        return env_vars + cmd
+        env_vars = " ".join(proj_cfg["add_env_vars"])
+        return f"{env_vars} {cmd}"
     else:
-        # Make command into a SLURM command
         ident = str(uuid.uuid4())[:8]
-        if slurm_add[cmd_idx] is not None:
-            ident = slurm_add[cmd_idx] + ident
         log_file = osp.join(RUNS_DIR, ident) + ".log"
+        cmd = cmd.replace("$SLURM_ID", ident)
 
         if not args.slurm_no_batch:
             run_file, run_name = generate_slurm_batch_file(
@@ -223,6 +196,7 @@ def get_cmd_run_str(cmd, args, cd, cmd_idx, num_cmds, slurm_add):
                 g[cmd_idx],
                 c[cmd_idx],
                 args,
+                proj_cfg,
             )
             return f"sbatch {run_file}"
         else:
@@ -238,7 +212,7 @@ def get_cmd_run_str(cmd, args, cd, cmd_idx, num_cmds, slurm_add):
             return f"srun {srun_settings} {python_path}/{cmd}"
 
 
-def sub_wb_query(cmd, args):
+def sub_wb_query(cmd, args, proj_cfg):
     parts = cmd.split("&")
     if len(parts) < 3:
         return [cmd]
@@ -251,7 +225,7 @@ def sub_wb_query(cmd, args):
     for i in range(len(parts)):
         if i % 2 == 0:
             wb_query = parts[i]
-            result = query_s(wb_query, verbose=False)
+            result = query_s(wb_query, proj_cfg, verbose=False)
             if len(result) > 0 and "last_model" in result[0]:
                 mod_seeds = [
                     " --seed " + x["last_model"].split("/")[-2].split("-")[2]
@@ -280,20 +254,56 @@ def log(s, args):
     print(s)
 
 
-def execute_command_file(cmd_path, add_args_str, cd, sess_name, sess_id, seed, args):
+def split_cmd(cmd):
+    cmd_parts = cmd.split(" ")
+    ret_cmds = [[]]
+    for cmd_part in cmd_parts:
+        prefix = ""
+        if "=" in cmd_part:
+            prefix, cmd_part = cmd_part.split("=")
+            prefix += "="
+
+        if "," in cmd_part:
+            ret_cmds = [
+                ret_cmd + [prefix + split_part]
+                for ret_cmd in ret_cmds
+                for split_part in cmd_part.split(",")
+            ]
+        else:
+            ret_cmds = [ret_cmd + [prefix + cmd_part] for ret_cmd in ret_cmds]
+    return [" ".join(ret_cmd) for ret_cmd in ret_cmds]
+
+
+def execute_command_file(run_cmd, args, proj_cfg):
     if not osp.exists(RUNS_DIR):
         os.makedirs(RUNS_DIR)
 
-    cmds = get_cmds(cmd_path, add_args_str, args)
+    cmds = get_cmds(run_cmd, args)
 
-    cmds = [c for cmd in cmds for c in sub_wb_query(cmd, args)]
+    # Sub in W&B args
+    cmds = [c for cmd in cmds for c in sub_wb_query(cmd, args, proj_cfg)]
 
+    # Split the commands.
+    cmds = [c for cmd in cmds for c in split_cmd(cmd)]
+
+    n_cmds = len(cmds)
+
+    # Add on the project data
     if args.proj_dat is not None:
-        proj_data = config_mgr.get_prop("proj_data", {})
-        lookups = args.proj_dat.split(",")
-        for k in lookups:
-            add_args = proj_data[k]
-            cmds = [cmd + " " + add_args for cmd in cmds]
+        proj_data = proj_cfg.get("proj_data", {})
+        for k in args.proj_dat.split(","):
+            cmds = [cmd + " " + proj_data[k] for cmd in cmds]
+
+    add_all = proj_cfg.get("add_all", None)
+    if add_all is not None:
+        cmds = [cmd + " " + add_all for cmd in cmds]
+
+    # Sub in variables
+    if "base_data_dir" in proj_cfg:
+        cmds = [cmd.replace("$DATA_DIR", proj_cfg["base_data_dir"]) for cmd in cmds]
+    group_ident = str(uuid.uuid4())[:8]
+    print(f"Assigning group ID {group_ident}")
+    cmds = [cmd.replace("$GROUP_ID", group_ident) for cmd in cmds]
 
     if args.pt_proc != -1:
         pt_dist_str = f"MULTI_PROC_OFFSET={args.mp_offset} python -u -m torch.distributed.launch --use_env --nproc_per_node {args.pt_proc} "
@@ -314,27 +324,25 @@ def execute_command_file(cmd_path, add_args_str, cd, sess_name, sess_id, seed, a
 
         cmds[0] = make_dist_cmd(cmds[0])
 
-    slurm_add = [None] * len(cmds)
-
     DELIM = " ; "
 
-    cd = as_list(cd, len(cmds))
+    cd = as_list(args.cd, n_cmds)
 
-    if sess_id == -1 and sess_name is None:
+    if args.sess_id == -1 and args.sess_name is None:
         if args.st is not None:
             for cmd_idx, cmd in enumerate(cmds):
-                run_cmd = get_cmd_run_str(cmd, args, cd, cmd_idx, len(cmds), slurm_add)
+                run_cmd = get_cmd_run_str(cmd, args, cmd_idx, n_cmds, proj_cfg)
                 log(f"Running {run_cmd}", args)
                 os.system(run_cmd)
         elif args.run_single:
-            cmds = [get_cmd_run_str(x, args, cd, 0, 1, slurm_add) for x in cmds]
+            cmds = [get_cmd_run_str(x, args, 0, 1, proj_cfg) for x in cmds]
             exec_cmd = DELIM.join(cmds)
 
             log(f"Running {exec_cmd}", args)
             os.system(exec_cmd)
 
-        elif len(cmds) == 1:
-            exec_cmd = get_cmd_run_str(cmds[0], args, cd, 0, len(cmds), slurm_add)
+        elif n_cmds == 1:
+            exec_cmd = get_cmd_run_str(cmds[0], args, 0, n_cmds, proj_cfg)
             if cd[0] != "-1":
                 exec_cmd = "CUDA_VISIBLE_DEVICES=" + cd[0] + " " + exec_cmd
             log(f"Running {exec_cmd}", args)
@@ -348,14 +356,13 @@ def execute_command_file(cmd_path, add_args_str, cd, sess_name, sess_id, seed, a
             cmds = [cmds]
 
         for cmd_idx, cmd in enumerate(cmds):
-            new_window = get_tmux_window(sess_name, sess_id)
+            new_window = get_tmux_window(args.sess_name, args.sess_id)
 
             log("running full command %s\n" % cmd, args)
 
-            run_cmd = get_cmd_run_str(cmd, args, cd, cmd_idx, len(cmds), slurm_add)
+            run_cmd = get_cmd_run_str(cmd, args, cmd_idx, n_cmds, proj_cfg)
 
             # Send the keys to run the command
-            conda_env = config_mgr.get_prop("conda_env")
             if args.st is None:
                 last_pane = new_window.attached_pane
                 last_pane.send_keys(run_cmd, enter=False)
@@ -363,7 +370,8 @@ def execute_command_file(cmd_path, add_args_str, cd, sess_name, sess_id, seed, a
                 pane.set_height(height=50)
                 pane.send_keys("source deactivate")
 
-                pane.send_keys("source activate " + conda_env)
+                if "conda_env" in proj_cfg:
+                    pane.send_keys("source activate " + proj_cfg["conda_env"])
                 pane.enter()
                 if cd[cmd_idx] != "-1":
                     pane.send_keys("export CUDA_VISIBLE_DEVICES=" + cd[cmd_idx])
@@ -381,9 +389,9 @@ def execute_command_file(cmd_path, add_args_str, cd, sess_name, sess_id, seed, a
 
 
 def generate_slurm_batch_file(
-    log_file, ident, python_path, cmd, st, ntasks, g, c, args
+    log_file, ident, python_path, cmd, st, ntasks, g, c, args, proj_cfg
 ):
-    ignore_nodes_s = ",".join(config_mgr.get_prop("slurm_ignore_nodes", []))
+    ignore_nodes_s = ",".join(proj_cfg.get("slurm_ignore_nodes", []))
     if len(ignore_nodes_s) != 0:
         ignore_nodes_s = "#SBATCH -x " + ignore_nodes_s
 
@@ -404,7 +412,7 @@ def generate_slurm_batch_file(
 
     cmd_line_exports = ""
     if not args.skip_env:
-        env_vars = config_mgr.get_prop("add_env_vars", [])
+        env_vars = proj_cfg.get("add_env_vars", [])
         env_vars = [f"export {x}" for x in env_vars]
         env_vars = "\n".join(env_vars)
 
@@ -463,38 +471,9 @@ srun %s"""
 def full_execute_command_file():
     parser = get_arg_parser()
     args, rest = parser.parse_known_args()
-    config_mgr.init(args.cfg)
-
-    if "rlf." in args.cmd:
-        args.cmd = args.cmd[len("rlf.") :].replace(".", "/")
-        rlf_dir = osp.dirname(osp.dirname(osp.realpath(__file__)))
-        config_mgr.set_prop("cmds_loc", rlf_dir)
-
-        cmd_path = osp.join(config_mgr.get_prop("cmds_loc"), args.cmd)
-        print("Executing ", cmd_path)
+    if args.cfg is None:
+        proj_cfg = {}
     else:
-        cmd_path = osp.join(config_mgr.get_prop("cmds_loc"), args.cmd)
+        proj_cfg = OmegaConf.load(args.cfg)
 
-    execute_command_file(
-        cmd_path, rest, args.cd, args.sess_name, args.sess_id, args.seed, args
-    )
-
-
-def execute_from_string(arg_str, cmds_loc, executable_path):
-    parser = get_arg_parser()
-    args, rest = parser.parse_known_args(arg_str)
-
-    config_mgr.init(args.cfg)
-
-    if cmds_loc is not None:
-        config_mgr.set_prop("cmds_loc", cmds_loc)
-    if executable_path is not None:
-        config_mgr.set_prop("file_path", executable_path)
-    cmd_path = osp.join(config_mgr.get_prop("cmds_loc"), args.cmd)
-    execute_command_file(
-        cmd_path, rest, args.cd, args.sess_name, args.sess_id, args.seed, args
-    )
-
-
-if __name__ == "__main__":
-    full_execute_command_file()
+    execute_command_file(rest, args, proj_cfg)

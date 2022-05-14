@@ -28,6 +28,7 @@ class Logger:
         save_dir: str,
         smooth_len: int,
         full_cfg: LoggerCfgType,
+        **kwargs,
     ):
         """
         :param run_name: If empty string then a run name will be auto generated.
