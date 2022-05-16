@@ -47,12 +47,15 @@ def query(
     api = wandb.Api()
 
     query_dict = {}
+    search_id = None
 
     for f, v in filter_fields.items():
         if f == "group":
             query_dict["group"] = v
         elif f == "tag":
             query_dict["tags"] = v
+        elif f == "id":
+            search_id = v
         else:
             raise ValueError(f"Filter {f}: {v} not supported")
 
@@ -60,10 +63,14 @@ def query(
         if verbose:
             print(s)
 
-    log("Querying with")
-    log(query_dict)
+    if search_id is None:
+        log("Querying with")
+        log(query_dict)
+        runs = api.runs(f"{wb_entity}/{wb_proj_name}", query_dict)
+    else:
+        log(f"Searching for ID {search_id}")
+        runs = [api.run(f"{wb_entity}/{wb_proj_name}/{search_id}")]
 
-    runs = api.runs(f"{wb_entity}/{wb_proj_name}", query_dict)
     log(f"Returned {len(runs)} runs")
 
     base_data_dir = proj_cfg["base_data_dir"]
@@ -72,17 +79,18 @@ def query(
         dat = {}
         for f in select_fields:
             if f == "last_model":
-                env_name = run.config["env_name"]
-                model_path = osp.join(base_data_dir, "checkpoints", env_name, run.name)
+                model_path = osp.join(run.config["logger"]["save_dir"], run.name)
                 if not osp.exists(model_path):
-                    raise ValueError(f"Could not locate model path {model_path}")
+                    raise ValueError(f"Could not locate model folder {model_path}")
                 model_idxs = [
-                    int(model_f.split("_")[1].split(".pt")[0])
+                    int(model_f.split("ckpt.")[1].split(".pth")[0])
                     for model_f in os.listdir(model_path)
-                    if model_f.startswith("model_")
+                    if model_f.startswith("ckpt.")
                 ]
+                if len(model_idxs) == 0:
+                    raise ValueError(f"No models found under {model_path}")
                 max_idx = max(model_idxs)
-                final_model_f = osp.join(model_path, f"model_{max_idx}.pt")
+                final_model_f = osp.join(model_path, f"ckpt.{max_idx}.pth")
                 v = final_model_f
             elif f == "final_train_success":
                 # Will by default get the most recent train success metric, if
@@ -115,6 +123,8 @@ def query(
                 v = run.summary[use_k]
             elif f == "status":
                 v = run.state
+            elif f == "config":
+                v = run.config
             elif f.startswith("config."):
                 v = run.config[f.split("config.")[0]]
             else:

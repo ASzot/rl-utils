@@ -16,7 +16,7 @@ except:
     libtmux = None
 import numpy as np
 from omegaconf import OmegaConf
-from rl_helper.launcher.wb_query import query_s
+from rl_helper.plotting.wb_query import query_s
 
 RUNS_DIR = "data/log/runs"
 
@@ -33,6 +33,12 @@ def get_arg_parser():
         "--sess-name", default=None, type=str, help="tmux session name to connect to"
     )
     parser.add_argument("--proj-dat", type=str, default=None)
+    parser.add_argument(
+        "--group-id",
+        type=str,
+        default=None,
+        help="If not assigned then a randomly assigned one is generated.",
+    )
     parser.add_argument(
         "--run-single",
         action="store_true",
@@ -226,11 +232,6 @@ def sub_wb_query(cmd, args, proj_cfg):
         if i % 2 == 0:
             wb_query = parts[i]
             result = query_s(wb_query, proj_cfg, verbose=False)
-            if len(result) > 0 and "last_model" in result[0]:
-                mod_seeds = [
-                    " --seed " + x["last_model"].split("/")[-2].split("-")[2]
-                    for x in result
-                ]
             if len(result) == 0:
                 raise ValueError(f"Got no response from {wb_query}")
             sub_vals = []
@@ -244,8 +245,6 @@ def sub_wb_query(cmd, args, proj_cfg):
         else:
             for j in range(len(new_cmd)):
                 new_cmd[j] += parts[i]
-    if mod_seeds is not None:
-        new_cmd = [c + seed for c, seed in zip(new_cmd, mod_seeds)]
 
     return new_cmd
 
@@ -301,9 +300,13 @@ def execute_command_file(run_cmd, args, proj_cfg):
     # Sub in variables
     if "base_data_dir" in proj_cfg:
         cmds = [cmd.replace("$DATA_DIR", proj_cfg["base_data_dir"]) for cmd in cmds]
-    group_ident = str(uuid.uuid4())[:8]
+    if args.group_id is None:
+        group_ident = str(uuid.uuid4())[:8]
+    else:
+        group_ident = args.group_id
     print(f"Assigning group ID {group_ident}")
     cmds = [cmd.replace("$GROUP_ID", group_ident) for cmd in cmds]
+    cmds = [cmd.replace("$CMD_RANK", str(rank_i)) for rank_i, cmd in enumerate(cmds)]
 
     if args.pt_proc != -1:
         pt_dist_str = f"MULTI_PROC_OFFSET={args.mp_offset} python -u -m torch.distributed.launch --use_env --nproc_per_node {args.pt_proc} "

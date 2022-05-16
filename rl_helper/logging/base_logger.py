@@ -7,7 +7,7 @@ import string
 import sys
 import time
 from collections import defaultdict, deque
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Set, Union
 
 import numpy as np
 import torch.nn as nn
@@ -58,6 +58,7 @@ class Logger:
         self.is_printing = True
         self.prev_steps = 0
         self.start = time.time()
+        self._clear_keys: Set[str] = set([])
 
     @property
     def save_path(self):
@@ -87,9 +88,16 @@ class Logger:
     def collect_info(
         self, k: str, value: float, prefix: str = "", no_rolling_window: bool = False
     ) -> None:
+        """
+        :param no_rolling_window: If true, then only the most recent logged
+            value will be displayed with a call to `self.interval_log`. This is for
+            metrics that should not be averaged.
+        """
+        use_k = prefix + k
         if no_rolling_window:
-            self._step_log_info[prefix + k].clear()
-        self._step_log_info[prefix + k].append(value)
+            self._step_log_info[use_k].clear()
+            self._clear_keys.add(use_k)
+        self._step_log_info[use_k].append(value)
 
     def collect_info_list(self, k: str, values: List[float], prefix: str = "") -> None:
         """
@@ -149,15 +157,15 @@ class Logger:
         rewards = self._step_log_info.get("episode.reward", [0])
 
         log_dat = {}
-        remove_keys = []
         for k, v in self._step_log_info.items():
             if isinstance(v, deque):
                 log_dat[k] = np.mean(v)
             else:
-                remove_keys.append(k)
                 log_dat[k] = v
-        for k in remove_keys:
+
+        for k in self._clear_keys:
             del self._step_log_info[k]
+        self._clear_keys.clear()
 
         if self.is_printing:
             print("")

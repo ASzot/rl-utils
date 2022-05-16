@@ -39,6 +39,7 @@ class PointMassParams:
     train_offset: float = np.pi / 4
     position_limit: float = 1.5
     transition_noise: float = 0.0
+    random_start_region_sample: bool = True
     custom_reward: Optional[
         Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
     ] = None
@@ -65,6 +66,7 @@ class PointMassEnv(VecEnv):
         self._device = device
         self._goal = torch.tensor([0.0, 0.0]).to(self._device)
         self._ep_step = 0
+        self._prev_dist_idx = -1
 
         self._ep_rewards = []
         obs_space = spaces.Box(low=-1.0, high=1.0, shape=(2,), seed=seed)
@@ -216,6 +218,12 @@ class PointMassEnv(VecEnv):
         ).to(self._device)
 
     def _get_dist_idx(self, batch_size):
+        if not self._params.random_start_region_sample:
+            new_dist_idx = self._prev_dist_idx + 1
+            new_dist_idx = new_dist_idx % self._params.num_train_regions
+            self._prev_dist_idx = new_dist_idx
+            return torch.full((batch_size,), new_dist_idx)
+
         if self._is_eval:
             return torch.randint(0, 4, (batch_size,))
         else:
