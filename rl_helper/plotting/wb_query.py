@@ -5,9 +5,12 @@ except:
 import os
 import os.path as osp
 import sys
+from argparse import ArgumentParser
 from collections import defaultdict
-from typing import Callable, Dict, List, Optional
+from pprint import pprint
+from typing import Any, Callable, Dict, List, Optional
 
+from omegaconf import DictConfig, OmegaConf
 from rl_helper.common.core_utils import CacheHelper
 
 
@@ -20,7 +23,7 @@ def extract_query_key(k):
 def query(
     select_fields: List[str],
     filter_fields: Dict[str, str],
-    proj_cfg,
+    proj_cfg: Dict[str, Any],
     verbose=True,
     limit=None,
     use_cached=False,
@@ -33,6 +36,11 @@ def query(
     :param filter_fields: Key is the filter type (like group or tag) and value
         is the filter value (like the name of the group or tag to match)
     :param reduce_op: `np.mean` would take the average of the results.
+    :param use_cached: Saves the results to disk so next time the same result is requested, it is loaded from disk rather than W&B.
+
+    Selectable fields that can be in select_fields:
+        - summary: The metrics for the model at the end of training. Also the
+          run state. Useful if you want to check run result.
     """
 
     wb_proj_name = proj_cfg["proj_name"]
@@ -121,12 +129,23 @@ def query(
                     )
                     return None
                 v = run.summary[use_k]
+            elif f == "summary":
+                v = dict(run.summary)
+                v["status"] = str(run.state)
+                # Filter out non-primitive values.
+                v = {
+                    k: k_v for k, k_v in v.items() if isinstance(k_v, (int, float, str))
+                }
+
             elif f == "status":
                 v = run.state
             elif f == "config":
                 v = run.config
+            elif f == "id":
+                v = run.id
             elif f.startswith("config."):
-                v = run.config[f.split("config.")[0]]
+                config_parts = f.split("config.")
+                v = run.config[config_parts[1]]
             else:
                 if f.startswith("ALL_"):
                     fetch_field = extract_query_key(f)
@@ -155,7 +174,10 @@ def query(
     return ret_data
 
 
-def query_s(query_str, proj_cfg, verbose=True):
+def query_s(
+    query_str: str, proj_cfg: DictConfig, verbose=True, use_cached: bool = False
+):
+
     select_s, filter_s = query_str.split(" WHERE ")
     select_fields = select_s.replace(" ", "").split(",")
 
@@ -170,4 +192,23 @@ def query_s(query_str, proj_cfg, verbose=True):
     filter_fields = [s.split("=") for s in filter_fields]
     filter_fields = {k: v for k, v in filter_fields}
 
-    return query(select_fields, filter_fields, proj_cfg, verbose=verbose, limit=limit)
+    return query(
+        select_fields,
+        filter_fields,
+        proj_cfg,
+        verbose=verbose,
+        limit=limit,
+        use_cached=use_cached,
+    )
+
+
+if __name__ == "__main__":
+    parser = ArgumentParser()
+    parser.add_argument("--cfg", required=True, type=str)
+    parser.add_argument("--cache", action="store_true")
+    args, query_args = parser.parse_known_args()
+    query_args = " ".join(query_args)
+    proj_cfg = OmegaConf.load(args.cfg)
+
+    result = query_s(query_args, proj_cfg, use_cached=args.cache, verbose=False)
+    pprint(result)

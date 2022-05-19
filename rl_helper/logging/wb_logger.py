@@ -82,7 +82,9 @@ class WbLogger(Logger):
         return wandb
 
     def collect_img(self, k: str, img_path: str, prefix: str = ""):
-        self._step_log_info[prefix + k] = wandb.Image(img_path)
+        use_k = prefix + k
+        self._step_log_info[use_k] = wandb.Image(img_path)
+        self._clear_keys.add(use_k)
 
     def close(self):
         self.run.finish()

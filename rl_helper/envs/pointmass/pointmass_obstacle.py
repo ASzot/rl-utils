@@ -97,8 +97,23 @@ class PointMassObstacleEnv(PointMassEnv):
             adjusted_pos = ob_pos + norm_pos
             new_pos[coll_idxs] = adjusted_pos[coll_idxs]
 
+        inside_obstacle = self.is_inside_obstacle(new_pos)
+
+        new_pos[inside_obstacle] = cur_pos[inside_obstacle]
+
+        return new_pos
+
+    def is_inside_obstacle(self, pos: torch.Tensor) -> torch.BoolTensor:
+        """
+        :param pos: A tensor of shape (N, 2).
+        :returns: Tensor of shape (N,) indicating if the points were inside the obstacle.
+        """
+
         homo_pos = torch.cat(
-            [new_pos, torch.ones(new_pos.shape[0], 1, device=self._device)], dim=-1
+            [pos, torch.ones(pos.shape[0], 1, device=self._device)], dim=-1
+        )
+        inside_any_box = torch.zeros(
+            pos.shape[0], device=self._device, dtype=torch.bool
         )
         for obs_T, xlen, ylen in self._square_obs_T:
             local_pos = torch.linalg.inv(obs_T) @ homo_pos.T
@@ -106,7 +121,5 @@ class PointMassObstacleEnv(PointMassEnv):
             inside_x = torch.logical_and(local_pos[0] < xlen, local_pos[0] > -xlen)
             inside_y = torch.logical_and(local_pos[1] < ylen, local_pos[1] > -ylen)
             inside_box = torch.logical_and(inside_x, inside_y)
-
-            new_pos[inside_box] = cur_pos[inside_box]
-
-        return new_pos
+            inside_any_box |= inside_box
+        return inside_any_box
