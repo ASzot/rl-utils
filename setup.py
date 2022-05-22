@@ -10,12 +10,12 @@ if osp.isfile(requirementPath):
         install_requires = f.read().splitlines()
 
 setuptools.setup(
-    name="rl-helper",
+    name="rl-utils",
     version="0.1",
     author="Andrew Szot",
     author_email="me@andrewszot.com",
     description="Library for RL research.",
-    url="https://github.com/aszot/rl-helper",
+    url="https://github.com/aszot/rl-utils",
     install_requires=install_requires,
     packages=setuptools.find_packages(),
 )

@@ -4,8 +4,8 @@ from typing import List, Optional, Tuple
 import numpy as np
 import torch
 
-from rl_helper.envs.pointmass.pointmass_env import PointMassEnv, PointMassParams
-from rl_helper.envs.registry import full_env_registry
+from rl_utils.envs.pointmass.pointmass_env import PointMassEnv, PointMassParams
+from rl_utils.envs.registry import full_env_registry
 
 
 @dataclass(frozen=True)

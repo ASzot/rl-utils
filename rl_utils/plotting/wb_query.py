@@ -11,7 +11,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from omegaconf import DictConfig, OmegaConf
 
-from rl_helper.common.core_utils import CacheHelper
+from rl_utils.common.core_utils import CacheHelper
 
 
 def extract_query_key(k):

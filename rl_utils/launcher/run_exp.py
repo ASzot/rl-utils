@@ -9,7 +9,7 @@ except ImportError:
     libtmux = None
 from omegaconf import OmegaConf
 
-from rl_helper.plotting.wb_query import query_s
+from rl_utils.plotting.wb_query import query_s
 
 RUNS_DIR = "data/log/runs"
 

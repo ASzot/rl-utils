@@ -10,7 +10,7 @@ import numpy as np
 import torch.nn as nn
 from omegaconf import DictConfig
 
-from rl_helper.common.core_utils import compress_and_filter_dict
+from rl_utils.common.core_utils import compress_and_filter_dict
 
 LoggerCfgType = Union[Dict[str, Any], DictConfig]
 

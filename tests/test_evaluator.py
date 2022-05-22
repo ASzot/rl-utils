@@ -3,9 +3,9 @@ import shutil
 
 import pytest
 
-from rl_helper.common import Evaluator
-from rl_helper.envs import create_vectorized_envs
-from rl_helper.interfaces import RandomPolicy
+from rl_utils.common import Evaluator
+from rl_utils.envs import create_vectorized_envs
+from rl_utils.interfaces import RandomPolicy
 
 
 @pytest.mark.parametrize(

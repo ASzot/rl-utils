@@ -1,4 +1,4 @@
-from rl_helper.logging import Logger
+from rl_utils.logging import Logger
 
 
 def test_base_logger():

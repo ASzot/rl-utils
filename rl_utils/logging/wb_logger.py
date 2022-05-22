@@ -1,6 +1,6 @@
 from omegaconf import DictConfig, OmegaConf
 
-from rl_helper.logging.base_logger import Logger, LoggerCfgType
+from rl_utils.logging.base_logger import Logger, LoggerCfgType
 
 try:
     import wandb

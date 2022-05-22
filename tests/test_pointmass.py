@@ -1,7 +1,7 @@
 import torch
 
-from rl_helper.envs import create_vectorized_envs
-from rl_helper.envs.pointmass import PointMassObstacleParams, PointMassParams
+from rl_utils.envs import create_vectorized_envs
+from rl_utils.envs.pointmass import PointMassObstacleParams, PointMassParams
 
 
 def test_create():

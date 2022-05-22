@@ -8,7 +8,7 @@ from collections.abc import Iterable
 
 import numpy as np
 
-from rl_helper.common.core_utils import dict_to_obs, obs_space_info, obs_to_dict
+from rl_utils.common.core_utils import dict_to_obs, obs_space_info, obs_to_dict
 
 from .vec_env import FINAL_OBS_KEY, CloudpickleWrapper, VecEnv, clear_mpi_env_vars
 

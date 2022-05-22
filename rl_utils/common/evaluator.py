@@ -7,10 +7,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from rl_helper.common.core_utils import compress_and_filter_dict
-from rl_helper.common.viz_utils import save_mp4
-from rl_helper.envs.vec_env.vec_env import VecEnv
-from rl_helper.interfaces import BasePolicy
+from rl_utils.common.core_utils import compress_and_filter_dict
+from rl_utils.common.viz_utils import save_mp4
+from rl_utils.envs.vec_env.vec_env import VecEnv
+from rl_utils.interfaces import BasePolicy
 
 
 class Evaluator:

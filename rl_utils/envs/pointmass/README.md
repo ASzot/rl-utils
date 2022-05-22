@@ -3,7 +3,7 @@
 ## Point Mass (No Obstacle)
 Use default arguments.
 ```
-from rl_helper.envs import create_vectorized_envs
+from rl_utils.envs import create_vectorized_envs
 envs = create_vectorized_envs(
     "PointMass-v0", num_envs=32
 )
@@ -11,8 +11,8 @@ envs = create_vectorized_envs(
 
 Change default arguments.
 ```
-from rl_helper.envs import create_vectorized_envs
-from rl_helper.envs.pointmass import PointMassParams
+from rl_utils.envs import create_vectorized_envs
+from rl_utils.envs.pointmass import PointMassParams
 envs = create_vectorized_envs(
     "PointMass-v0", num_envs=32, params=PointMassParams(dt=0.1, ep_horizon=10)
 )
@@ -21,13 +21,13 @@ envs = create_vectorized_envs(
 ## Point Mass (With Obstacle)
 Use default arguments.
 ```
-from rl_helper.envs import create_vectorized_envs
+from rl_utils.envs import create_vectorized_envs
 envs = create_vectorized_envs("PointMassObstacle-v0", num_envs=32)
 ```
 Change default arguments.
 ```
-from rl_helper.envs import create_vectorized_envs
-from rl_helper.envs.pointmass import PointMassObstacleParams
+from rl_utils.envs import create_vectorized_envs
+from rl_utils.envs.pointmass import PointMassObstacleParams
 envs = create_vectorized_envs(
     "PointMassObstacle-v0",
     num_envs=32,

@@ -6,8 +6,8 @@ import torch
 from gym import spaces
 from torch.distributions import Uniform
 
-from rl_helper.envs.registry import full_env_registry
-from rl_helper.envs.vec_env.vec_env import FINAL_OBS_KEY, VecEnv
+from rl_utils.envs.registry import full_env_registry
+from rl_utils.envs.vec_env.vec_env import FINAL_OBS_KEY, VecEnv
 
 
 @dataclass(frozen=True)

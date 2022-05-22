@@ -2,7 +2,7 @@ import contextlib
 import os
 from abc import ABC, abstractmethod
 
-from rl_helper.common.tile_images import tile_images
+from rl_utils.common.tile_images import tile_images
 
 FINAL_OBS_KEY = "final_obs"
 

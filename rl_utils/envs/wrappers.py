@@ -2,8 +2,8 @@ import gym
 import numpy as np
 import torch
 
-import rl_helper.common.core_utils as utils
-from rl_helper.envs.vec_env.vec_env import VecEnvWrapper
+import rl_utils.common.core_utils as utils
+from rl_utils.envs.vec_env.vec_env import VecEnvWrapper
 
 
 # Checks whether done was caused my timit limits or not
