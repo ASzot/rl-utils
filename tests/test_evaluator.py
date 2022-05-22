@@ -5,7 +5,7 @@ import pytest
 
 from rl_helper.common import Evaluator
 from rl_helper.envs import create_vectorized_envs
-from rl_helper.templates import RandomPolicy
+from rl_helper.interfaces import RandomPolicy
 
 
 @pytest.mark.parametrize(
