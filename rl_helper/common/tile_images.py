@@ -28,10 +28,7 @@ def tile_images(img_nhwc):
         return tile_images(img_nhwc)
 
     if len(img_nhwc.shape) == 5:
-        result = np.array(
-            [tile_images(img_nhwc[:, i]) for i in range(img_nhwc.shape[1])]
-        )
-        return result
+        return np.array([tile_images(img_nhwc[:, i]) for i in range(img_nhwc.shape[1])])
 
     N, h, w, c = img_nhwc.shape
 
@@ -43,5 +40,4 @@ def tile_images(img_nhwc):
     img_HWhwc[:, :, :, -1, :] = 0
     img_HWhwc[:, :, -1, :, :] = 0
     img_HhWwc = img_HWhwc.transpose(0, 2, 1, 3, 4)
-    img_Hh_Ww_c = img_HhWwc.reshape(H * h, W * w, c)
-    return img_Hh_Ww_c
+    return img_HhWwc.reshape(H * h, W * w, c)

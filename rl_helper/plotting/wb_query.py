@@ -1,16 +1,16 @@
 try:
     import wandb
-except:
-    pass
+except ImportError:
+    wandb = None
 import os
 import os.path as osp
-import sys
 from argparse import ArgumentParser
 from collections import defaultdict
 from pprint import pprint
 from typing import Any, Callable, Dict, List, Optional
 
 from omegaconf import DictConfig, OmegaConf
+
 from rl_helper.common.core_utils import CacheHelper
 
 
@@ -51,6 +51,8 @@ def query(
 
     if use_cached and cache.exists():
         return cache.load()
+    if wandb is None:
+        raise ValueError("Wandb is not installed")
 
     api = wandb.Api()
 
@@ -81,7 +83,6 @@ def query(
 
     log(f"Returned {len(runs)} runs")
 
-    base_data_dir = proj_cfg["base_data_dir"]
     ret_data = []
     for run in runs:
         dat = {}

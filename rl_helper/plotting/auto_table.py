@@ -56,7 +56,7 @@ def plot_table(
     cell_key: str,
     col_order: List[str],
     row_order: List[str],
-    renames: Dict[str, str] = {},
+    renames: Optional[Dict[str, str]] = None,
     error_scaling=1.0,
     n_decimals=2,
     missing_fill_value=MISSING_VALUE,
@@ -96,6 +96,9 @@ def plot_table(
     :param x_label: Renders another row of text on the top that spans all the columns.
     ;param y_label: Renders a side column with vertically rotated text that spawns all the rows.
     """
+
+    if renames is None:
+        renames = {}
     df = df.replace("missing", missing_fill_value)
     df = df.replace("error", error_fill_value)
 
@@ -148,14 +151,14 @@ def plot_table(
                         row_str.append(
                             "\\textbf{ "
                             + (
-                                f"%.{n_decimals}f {{\\scriptsize $\pm$ %.{n_decimals}f }}"
+                                f"%.{n_decimals}f {{\\scriptsize $\\pm$ %.{n_decimals}f }}"
                                 % (val, std)
                             )
                             + " }"
                         )
                     else:
                         row_str.append(
-                            f" %.{n_decimals}f {{\\scriptsize $\pm$ %.{n_decimals}f }} "
+                            f" %.{n_decimals}f {{\\scriptsize $\\pm$ %.{n_decimals}f }} "
                             % (val, std)
                         )
 
@@ -185,7 +188,7 @@ def plot_table(
         toprule = ""
 
     if x_label != "":
-        toprule += ("& \multicolumn{%i}{c}{%s}" % (n_columns, x_label)) + row_sep
+        toprule += ("& \\multicolumn{%i}{c}{%s}" % (n_columns, x_label)) + row_sep
 
     ret_s = ""
     ret_s += "\\begin{tabular}{%s}\n" % col_header_s
@@ -197,9 +200,8 @@ def plot_table(
     ret_s += midrule
 
     all_row_s = ""
-    for i, row_line in enumerate(row_lines):
+    for row_line in row_lines:
         all_row_s += row_line
-        is_last_row = i == (len(row_lines) - 1)
         if "hline" not in row_line:
             all_row_s += row_sep
         else:

@@ -22,7 +22,6 @@ class BasePolicy(abc.ABC):
         :returns: Dictionary at least with keys (can include more information as needed, such as action log probabilities):
             "actions": torch.Tensor of shape [batch_size, action_dim]
         """
-        pass
 
 
 class RandomPolicy(BasePolicy):

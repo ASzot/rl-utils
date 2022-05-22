@@ -1,21 +1,14 @@
 import argparse
-import datetime
 import os
 import os.path as osp
-import random
-import re
-import string
-import subprocess
-import sys
-import time
 import uuid
 
 try:
     import libtmux
-except:
+except ImportError:
     libtmux = None
-import numpy as np
 from omegaconf import OmegaConf
+
 from rl_helper.plotting.wb_query import query_s
 
 RUNS_DIR = "data/log/runs"
@@ -144,9 +137,7 @@ def get_cmds(rest, args):
         cmds = [cmd]
 
     cmds = list(filter(lambda x: not (x.startswith("#") or x == "\n"), cmds))
-    cmds = [f"{cmd.rstrip()} {rest}" for cmd in cmds]
-
-    return cmds
+    return [f"{cmd.rstrip()} {rest}" for cmd in cmds]
 
 
 def get_tmux_window(sess_name, sess_id):
@@ -155,7 +146,6 @@ def get_tmux_window(sess_name, sess_id):
     server = libtmux.Server()
 
     if sess_name is None:
-        tmp = server.list_sessions()
         sess = server.get_by_id("$%i" % sess_id)
     else:
         sess = server.find_where({"session_name": sess_name})
@@ -170,7 +160,7 @@ def as_list(x, max_num):
         return [x for _ in range(max_num)]
     x = x.split("|")
     if len(x) == 1:
-        x = [x[0] for _ in range(max_num)]
+        return [x[0] for _ in range(max_num)]
     return x
 
 
@@ -225,8 +215,6 @@ def sub_wb_query(cmd, args, proj_cfg):
 
     new_cmd = [parts[0]]
     parts = parts[1:]
-
-    mod_seeds = None
 
     for i in range(len(parts)):
         if i % 2 == 0:
@@ -405,15 +393,12 @@ def generate_slurm_batch_file(
         add_options.append(f'#SBATCH --comment="{args.comment}"')
     add_options = "\n".join(add_options)
 
-    pre_python_txt = ""
     python_parts = cmd.split("python")
     has_python = False
     if len(python_parts) > 1:
-        pre_python_txt = python_parts[0]
         cmd = "python" + python_parts[1]
         has_python = True
 
-    cmd_line_exports = ""
     if not args.skip_env:
         env_vars = proj_cfg.get("add_env_vars", [])
         env_vars = [f"export {x}" for x in env_vars]

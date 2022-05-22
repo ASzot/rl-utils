@@ -3,9 +3,8 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 import torch
-from gym import spaces
-from rl_helper.envs.pointmass.pointmass_env import (PointMassEnv,
-                                                    PointMassParams)
+
+from rl_helper.envs.pointmass.pointmass_env import PointMassEnv, PointMassParams
 from rl_helper.envs.registry import full_env_registry
 
 

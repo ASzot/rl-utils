@@ -57,7 +57,6 @@ class VecEnv(ABC):
         be cancelled and step_wait() should not be called
         until step_async() is invoked again.
         """
-        pass
 
     @abstractmethod
     def step_async(self, actions):
@@ -69,7 +68,6 @@ class VecEnv(ABC):
         You should not call this if a step_async run is
         already pending.
         """
-        pass
 
     @abstractmethod
     def step_wait(self):
@@ -83,14 +81,12 @@ class VecEnv(ABC):
          - dones: an array of "episode done" booleans
          - infos: a sequence of info objects
         """
-        pass
 
     def close_extras(self):
         """
         Clean up the  extra resources, beyond what's in this base class.
         Only runs when not self.closed.
         """
-        pass
 
     def close(self):
         if self.closed:
@@ -115,12 +111,6 @@ class VecEnv(ABC):
         if mode == "human":
             self.get_viewer().imshow(bigimg)
             return self.get_viewer().isopen
-        elif mode == "rgb_array":
-            return bigimg
-        elif mode == "rgb_array_text":
-            return bigimg
-        elif mode == "rgb_array_text_high":
-            return bigimg
         else:
             return bigimg
 
@@ -195,7 +185,7 @@ class VecEnvObservationWrapper(VecEnvWrapper):
         return self.process(obs), rews, dones, infos
 
 
-class CloudpickleWrapper(object):
+class CloudpickleWrapper:
     """
     Uses cloudpickle to serialize contents (otherwise multiprocessing tries to use pickle)
     """

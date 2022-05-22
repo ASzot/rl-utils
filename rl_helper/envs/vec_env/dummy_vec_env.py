@@ -1,8 +1,8 @@
 from collections.abc import Iterable
 
 import numpy as np
-from rl_helper.common.core_utils import (copy_obs_dict, dict_to_obs,
-                                         obs_space_info)
+
+from rl_helper.common.core_utils import copy_obs_dict, dict_to_obs, obs_space_info
 
 from .vec_env import VecEnv
 

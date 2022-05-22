@@ -1,5 +1,3 @@
-import time
-
 import numpy as np
 
 from . import VecEnvWrapper
@@ -13,10 +11,10 @@ class VecMonitor(VecEnvWrapper):
         self.epcount = 0
 
     def reset(self):
-        obs = self.venv.reset()
         self.eprets = np.zeros(self.num_envs, "f")
         self.eplens = np.zeros(self.num_envs, "i")
-        return obs
+
+        return self.venv.reset()
 
     def step_wait(self):
         obs, rews, dones, infos = self.venv.step_wait()

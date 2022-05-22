@@ -1,14 +1,13 @@
 from dataclasses import dataclass
-from functools import wraps
 from typing import Callable, Optional
 
-import gym
 import numpy as np
 import torch
 from gym import spaces
+from torch.distributions import Uniform
+
 from rl_helper.envs.registry import full_env_registry
 from rl_helper.envs.vec_env.vec_env import FINAL_OBS_KEY, VecEnv
-from torch.distributions import Uniform
 
 
 @dataclass(frozen=True)
@@ -206,7 +205,7 @@ class PointMassEnv(VecEnv):
         else:
             reward = self._params.custom_reward(self.cur_pos, self._prev_pos, action)
         self._prev_pos = self.cur_pos.detach().clone()
-        return reward
+        return reward  # noqa: R504
 
     def get_regions(self, offset, spread):
         inc = np.pi / 2

@@ -1,7 +1,8 @@
 import gym
 import numpy as np
-import rl_helper.common.core_utils as utils
 import torch
+
+import rl_helper.common.core_utils as utils
 from rl_helper.envs.vec_env.vec_env import VecEnvWrapper
 
 
@@ -25,13 +26,12 @@ class VecPyTorch(VecEnvWrapper):
 
     def _data_convert(self, arr):
         if isinstance(arr, np.ndarray) and arr.dtype == np.float64:
-            arr = arr.astype(np.float32)
+            return arr.astype(np.float32)
         return arr
 
     def reset(self):
         obs = self.venv.reset()
-        obs = self._trans_obs(obs)
-        return obs
+        return self._trans_obs(obs)
 
     def step_async(self, actions):
         if isinstance(actions, torch.LongTensor):
@@ -45,14 +45,13 @@ class VecPyTorch(VecEnvWrapper):
         def _convert_obs(x):
             x = self._data_convert(x)
             x = torch.Tensor(x)
-            x = x.to(self.device)
-            return x
+            return x.to(self.device)
 
         if isinstance(obs, dict):
             for k in obs:
                 obs[k] = _convert_obs(obs[k])
         else:
-            obs = _convert_obs(obs)
+            return _convert_obs(obs)
         return obs
 
     def step_wait(self):
@@ -100,8 +99,7 @@ class VecPyTorchFrameStack(VecEnvWrapper):
     def reset(self):
         obs = self.venv.reset()
         stacked_obs = self.stacked_obs.reset(obs)
-        obs = utils.set_def_obs(obs, stacked_obs)
-        return obs
+        return utils.set_def_obs(obs, stacked_obs)
 
     def close(self):
         self.venv.close()

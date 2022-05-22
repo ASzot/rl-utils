@@ -1,10 +1,7 @@
 import datetime
 import os
 import os.path as osp
-import pipes
-import random
 import string
-import sys
 import time
 from collections import defaultdict, deque
 from typing import Any, Dict, List, Set, Union
@@ -12,8 +9,8 @@ from typing import Any, Dict, List, Set, Union
 import numpy as np
 import torch.nn as nn
 from omegaconf import DictConfig
+
 from rl_helper.common.core_utils import compress_and_filter_dict
-from six.moves import shlex_quote
 
 LoggerCfgType = Union[Dict[str, Any], DictConfig]
 
@@ -58,7 +55,7 @@ class Logger:
         self.is_printing = True
         self.prev_steps = 0
         self.start = time.time()
-        self._clear_keys: Set[str] = set([])
+        self._clear_keys: Set[str] = set()
 
     @property
     def save_path(self):
@@ -111,10 +108,9 @@ class Logger:
             d = datetime.datetime.today()
             date_id = "%i%i" % (d.month, d.day)
 
-            chars = [
-                x
-                for x in string.ascii_uppercase + string.digits + string.ascii_lowercase
-            ]
+            chars = list(
+                string.ascii_uppercase + string.digits + string.ascii_lowercase
+            )
             rnd_id = np.random.RandomState().choice(chars, 6)
             rnd_id = "".join(rnd_id)
 
@@ -127,20 +123,17 @@ class Logger:
         """
         Log key value pairs to whatever interface.
         """
-        pass
 
     def collect_img(self, k: str, img_path: str, prefix: str = ""):
         """
         Log an image
         :param img_path: Full path to the image.
         """
-        pass
 
     def watch_model(self, model: nn.Module):
         """
         :param model: the set of parameters to watch
         """
-        pass
 
     def interval_log(self, update_count: int, processed_env_steps: int) -> None:
         """
@@ -154,7 +147,6 @@ class Logger:
         fps = int((processed_env_steps - self.prev_steps) / (end - self.start))
         self.prev_steps = processed_env_steps
         num_eps = len(self._step_log_info.get("episode.reward", []))
-        rewards = self._step_log_info.get("episode.reward", [0])
 
         log_dat = {}
         for k, v in self._step_log_info.items():

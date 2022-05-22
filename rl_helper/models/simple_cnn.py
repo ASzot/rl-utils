@@ -4,7 +4,6 @@ Code is from https://github.com/facebookresearch/habitat-lab/blob/main/habitat_b
 
 from typing import Dict, List, Optional, Union
 
-import gym.spaces as spaces
 import numpy as np
 import torch
 from torch import nn as nn

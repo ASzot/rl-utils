@@ -1,16 +1,15 @@
 from functools import partial
-from typing import Any, Callable, Dict, Optional
+from typing import Callable, Optional
 
 import gym
 import torch
-from rl_helper.envs.pointmass import pointmass_env, pointmass_obstacle
+
 from rl_helper.envs.registry import full_env_registry
 from rl_helper.envs.vec_env.dummy_vec_env import DummyVecEnv
 from rl_helper.envs.vec_env.shmem_vec_env import ShmemVecEnv
 from rl_helper.envs.vec_env.vec_env import VecEnv
 from rl_helper.envs.vec_env.vec_monitor import VecMonitor
-from rl_helper.envs.wrappers import (TimeLimitMask, VecPyTorch,
-                                     VecPyTorchFrameStack)
+from rl_helper.envs.wrappers import TimeLimitMask, VecPyTorch, VecPyTorchFrameStack
 
 
 def create_vectorized_envs(
@@ -57,5 +56,5 @@ def create_vectorized_envs(
     envs = VecPyTorch(envs, device)
 
     if num_frame_stack is not None:
-        envs = VecPyTorchFrameStack(envs, num_frame_stack, device)
+        return VecPyTorchFrameStack(envs, num_frame_stack, device)
     return envs

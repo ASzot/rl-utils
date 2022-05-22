@@ -7,11 +7,10 @@ import multiprocessing as mp
 from collections.abc import Iterable
 
 import numpy as np
-from rl_helper.common.core_utils import (dict_to_obs, obs_space_info,
-                                         obs_to_dict)
 
-from .vec_env import (FINAL_OBS_KEY, CloudpickleWrapper, VecEnv,
-                      clear_mpi_env_vars)
+from rl_helper.common.core_utils import dict_to_obs, obs_space_info, obs_to_dict
+
+from .vec_env import FINAL_OBS_KEY, CloudpickleWrapper, VecEnv, clear_mpi_env_vars
 
 _NP_TO_CT = {
     np.float32: ctypes.c_float,
