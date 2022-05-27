@@ -39,3 +39,25 @@ class DictDataset(Dataset):
 
     def __len__(self) -> int:
         return self._dataset_len
+
+
+def extract_next_tensor(dataset: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    obs = dataset["observations"].detach()
+
+    final_final_obs = dataset["infos"][-1]["final_obs"]
+
+    next_obs = torch.cat([obs[1:], final_final_obs.unsqueeze(0)], 0)
+    num_eps = 1
+    for i in range(obs.shape[0] - 1):
+        cur_info = dataset["infos"][i]
+        if "final_obs" in cur_info:
+            num_eps += 1
+            next_obs[i] = cur_info["final_obs"].detach()
+
+    if num_eps != dataset["terminals"].sum():
+        raise ValueError(
+            f"Inconsistency in # of episodes {num_eps} vs {dataset['terminals'].sum()}"
+        )
+    dataset["next_observations"] = next_obs.detach()
+
+    return dataset

@@ -2,7 +2,7 @@
 Code is from https://github.com/facebookresearch/habitat-lab/blob/main/habitat_baselines/rl/models/simple_cnn.py
 """
 
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Union
 
 import numpy as np
 import torch
@@ -10,28 +10,28 @@ from torch import nn as nn
 
 
 class SimpleCNN(nn.Module):
-    r"""A Simple 3-Conv CNN followed by a fully connected layer
+    """A Simple 3-Conv CNN followed by a fully connected layer
 
-    Takes in observations and produces an embedding of the rgb and/or depth components
+    Takes in observations and produces an embedding of the rgb and/or depth
+        components. Note the observation spaces should be in format (W, H, C) but
+        the input to the model should be in format (C, W, H).
 
-    Args:
-        observation_space: The observation_space of the agent
-        output_size: The size of the embedding vector
+    :param obs_shape: Either a dictionary of observation space shapes or the
+        observation space shape. This will only select the keys from the
+        observation space have 3 tensor dimensions.
+    :param output_size: The hidden dimension output size
     """
 
     def __init__(
         self,
         obs_shape: Union[Dict[str, List[int]], List[int]],
         output_size: int,
-        obs_input_keys: Optional[List[str]] = None,
     ):
         super().__init__()
         if not isinstance(obs_shape, dict):
             obs_shape = {None: obs_shape}
-            obs_input_keys = [None]
 
-        if obs_input_keys is None:
-            obs_input_keys = [k for k, v in obs_shape.items() if len(v) == 3]
+        obs_input_keys = [k for k, v in obs_shape.items() if len(v) == 3]
 
         self._n_input = sum(obs_shape[k][2] for k in obs_input_keys)
         self._obs_input_keys = obs_input_keys

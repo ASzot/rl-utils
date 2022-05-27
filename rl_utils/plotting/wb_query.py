@@ -12,12 +12,46 @@ from typing import Any, Callable, Dict, List, Optional
 from omegaconf import DictConfig, OmegaConf
 
 from rl_utils.common.core_utils import CacheHelper
+from rl_utils.plotting.utils import MISSING_VALUE
 
 
 def extract_query_key(k):
     if k.startswith("ALL_"):
         return k.split("ALL_")[1]
     return k
+
+
+def batch_query(
+    all_select_fields: List[List[str]],
+    all_filter_fields: List[Dict[str, Any]],
+    all_should_skip: List[bool],
+    all_add_info: List[Dict[str, Any]],
+    proj_cfg: Dict[str, Any],
+    verbose=True,
+    limit=None,
+    use_cached=False,
+    reduce_op: Optional[Callable[[List], float]] = None,
+):
+    data = []
+    for select_fields, filter_fields, should_skip, add_info in zip(
+        all_select_fields, all_filter_fields, all_should_skip, all_add_info
+    ):
+        r = []
+        if not should_skip:
+            r = query(
+                select_fields,
+                filter_fields,
+                proj_cfg,
+                verbose,
+                limit,
+                use_cached,
+                reduce_op,
+            )
+        if len(r) == 0:
+            r = [{k: MISSING_VALUE for k in select_fields}]
+        for d in r:
+            data.append({**add_info, **d})
+    return data
 
 
 def query(
@@ -84,8 +118,8 @@ def query(
     log(f"Returned {len(runs)} runs")
 
     ret_data = []
-    for run in runs:
-        dat = {}
+    for rank_i, run in enumerate(runs):
+        dat = {"rank": rank_i}
         for f in select_fields:
             if f == "last_model":
                 model_path = osp.join(run.config["logger"]["save_dir"], run.name)
