@@ -22,14 +22,17 @@ class Evaluator:
         self,
         envs: VecEnv,
         rnn_hxs_dim: int,
-        num_render: Optional[int],
-        vid_dir: str,
-        fps: int,
+        num_render: Optional[int] = None,
+        vid_dir: str = "data/vids",
+        fps: int = 10,
         save_traj_name: Optional[str] = None,
         **kwargs,
     ):
         """
-        :param save_traj_name: The full file path (for example "data/trajs/data.pth") to save the evaluated trajectories to.
+        :param save_traj_name: The full file path (for example
+            "data/trajs/data.pth") to save the evaluated trajectories to.
+        :param num_render: If None then every episode will be rendered.
+        :param rnn_hxs_dim: The recurrent hidden state dimension.
         """
         self._envs = envs
         self._rnn_hxs_dim = rnn_hxs_dim
@@ -103,10 +106,10 @@ class Evaluator:
 
         torch.save(
             {
-                "observations": obs,
+                "obs": obs,
                 "actions": actions,
                 "rewards": rewards,
-                "terminals": terminals,
+                "masks": (~terminals.bool()).float(),
                 "infos": self._all_traj_info,
             },
             self._save_traj_name,
@@ -144,8 +147,8 @@ class Evaluator:
 
         while sum(num_evals) != 0:
             act_data = policy.act(obs, rnn_hxs, eval_masks, deterministic=True)
-            next_obs, rewards, done, info = self._envs.step(act_data["action"])
-            rnn_hxs = act_data["recurrent_hidden_states"]
+            next_obs, rewards, done, info = self._envs.step(act_data["actions"])
+            rnn_hxs = act_data["hxs"]
 
             if total_evaluated < num_render:
                 frames = self._envs.render(mode="rgb_array")
@@ -153,7 +156,7 @@ class Evaluator:
 
             for env_i in range(num_envs):
                 self._add_transition_to_save(
-                    env_i, obs, act_data["action"], rewards, done, info
+                    env_i, obs, act_data["actions"], rewards, done, info
                 )
 
                 if done[env_i]:
