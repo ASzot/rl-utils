@@ -1,6 +1,8 @@
 import argparse
 import os
 import os.path as osp
+import random
+import string
 import uuid
 
 try:
@@ -164,6 +166,11 @@ def as_list(x, max_num):
     return x
 
 
+def get_random_id() -> str:
+    rnd_id = str(uuid.uuid4())[:8]
+    return random.choice(string.ascii_uppercase) + rnd_id
+
+
 def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg):
     conda_env = proj_cfg["conda_env"]
     python_path = osp.join(osp.expanduser("~"), "miniconda3", "envs", conda_env, "bin")
@@ -172,14 +179,14 @@ def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg):
     ntasks = as_list(args.ntasks, num_cmds)
     g = as_list(args.g, num_cmds)
     c = as_list(args.c, num_cmds)
+    ident = get_random_id()
+    log_file = osp.join(RUNS_DIR, ident) + ".log"
+    cmd = cmd.replace("$SLURM_ID", ident)
 
     if args.st is None:
         env_vars = " ".join(proj_cfg["add_env_vars"])
         return f"{env_vars} {cmd}"
     else:
-        ident = str(uuid.uuid4())[:8]
-        log_file = osp.join(RUNS_DIR, ident) + ".log"
-        cmd = cmd.replace("$SLURM_ID", ident)
 
         if not args.slurm_no_batch:
             run_file, run_name = generate_slurm_batch_file(
@@ -224,6 +231,7 @@ def sub_wb_query(cmd, args, proj_cfg):
                 raise ValueError(f"Got no response from {wb_query}")
             sub_vals = []
             for match in result:
+                del match["rank"]
                 if len(match) > 1:
                     raise ValueError(f"Only single value query supported, got {match}")
                 sub_val = list(match.values())[0]
@@ -288,13 +296,16 @@ def execute_command_file(run_cmd, args, proj_cfg):
     # Sub in variables
     if "base_data_dir" in proj_cfg:
         cmds = [cmd.replace("$DATA_DIR", proj_cfg["base_data_dir"]) for cmd in cmds]
+
     if args.group_id is None:
-        group_ident = str(uuid.uuid4())[:8]
+        group_ident = get_random_id()
     else:
         group_ident = args.group_id
     print(f"Assigning group ID {group_ident}")
     cmds = [cmd.replace("$GROUP_ID", group_ident) for cmd in cmds]
     cmds = [cmd.replace("$CMD_RANK", str(rank_i)) for rank_i, cmd in enumerate(cmds)]
+    cmds = [cmd.replace("$PROJECT_NAME", proj_cfg.proj_name) for cmd in cmds]
+    cmds = [cmd.replace("$WB_ENTITY", proj_cfg.wb_entity) for cmd in cmds]
 
     if args.pt_proc != -1:
         pt_dist_str = f"MULTI_PROC_OFFSET={args.mp_offset} python -u -m torch.distributed.launch --use_env --nproc_per_node {args.pt_proc} "

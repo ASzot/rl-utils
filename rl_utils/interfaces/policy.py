@@ -21,6 +21,7 @@ class BasePolicy(abc.ABC):
         """
         :returns: Dictionary at least with keys (can include more information as needed, such as action log probabilities):
             "actions": torch.Tensor of shape [batch_size, action_dim]
+            "hxs": torch.Tensor of shape [batch_size, D] for hidden dimension size D.
         """
 
 
@@ -33,4 +34,4 @@ class RandomPolicy(BasePolicy):
             np.array([self._action_space.sample() for _ in range(obs.size(0))])
         )
 
-        return {"action": action, "recurrent_hidden_states": hidden_state}
+        return {"actions": action, "hxs": hidden_state}

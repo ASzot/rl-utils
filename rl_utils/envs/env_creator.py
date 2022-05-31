@@ -4,6 +4,7 @@ from typing import Callable, Optional
 import gym
 import torch
 
+import rl_utils.envs.pointmass  # noqa: F401
 from rl_utils.envs.registry import full_env_registry
 from rl_utils.envs.vec_env.dummy_vec_env import DummyVecEnv
 from rl_utils.envs.vec_env.shmem_vec_env import ShmemVecEnv

@@ -18,13 +18,13 @@ LoggerCfgType = Union[Dict[str, Any], DictConfig]
 class Logger:
     def __init__(
         self,
-        run_name: str,
         seed: int,
         log_dir: str,
         vid_dir: str,
         save_dir: str,
-        smooth_len: int,
         full_cfg: LoggerCfgType,
+        smooth_len: int = 1,
+        run_name: str = "",
         **kwargs,
     ):
         """

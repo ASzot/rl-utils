@@ -17,13 +17,13 @@ class WbLogger(Logger):
         self,
         wb_proj_name: str,
         wb_entity: str,
-        run_name: str,
         seed: int,
         log_dir: str,
         vid_dir: str,
         save_dir: str,
-        smooth_len: int,
         full_cfg: LoggerCfgType,
+        smooth_len: int = 1,
+        run_name: str = "",
         group_name: str = "",
         **kwargs,
     ):
@@ -35,7 +35,7 @@ class WbLogger(Logger):
             raise ImportError("Wandb is not installed")
 
         super().__init__(
-            run_name, seed, log_dir, vid_dir, save_dir, smooth_len, full_cfg
+            seed, log_dir, vid_dir, save_dir, full_cfg, smooth_len, run_name
         )
         if wb_proj_name == "" or wb_entity == "":
             raise ValueError(
