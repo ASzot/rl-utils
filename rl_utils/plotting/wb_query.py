@@ -9,6 +9,7 @@ from collections import defaultdict
 from pprint import pprint
 from typing import Any, Callable, Dict, List, Optional
 
+import numpy as np
 from omegaconf import DictConfig, OmegaConf
 
 from rl_utils.common.core_utils import CacheHelper
@@ -72,9 +73,7 @@ def query(
     :param reduce_op: `np.mean` would take the average of the results.
     :param use_cached: Saves the results to disk so next time the same result is requested, it is loaded from disk rather than W&B.
 
-    Selectable fields that can be in select_fields:
-        - summary: The metrics for the model at the end of training. Also the
-          run state. Useful if you want to check run result.
+    See README for more information.
     """
 
     wb_proj_name = proj_cfg["proj_name"]
@@ -135,35 +134,6 @@ def query(
                 max_idx = max(model_idxs)
                 final_model_f = osp.join(model_path, f"ckpt.{max_idx}.pth")
                 v = final_model_f
-            elif f == "final_train_success":
-                # Will by default get the most recent train success metric, if
-                # none exists then will get the most recent eval success metric
-                # (useful for methods that are eval only)
-                succ_keys = [
-                    k
-                    for k in list(run.summary.keys())
-                    if isinstance(k, str)
-                    and "success" in k
-                    and "std" not in k
-                    and "max" not in k
-                    and "min" not in k
-                ]
-                train_succ_keys = [
-                    k for k in succ_keys if "eval_final" in k or "eval_train" in k
-                ]
-                if len(train_succ_keys) > 0:
-                    use_k = train_succ_keys[0]
-                elif len(succ_keys) > 0:
-                    use_k = succ_keys[0]
-                else:
-                    print(
-                        "Could not find success key from ",
-                        run.summary.keys(),
-                        "Possibly due to run failure. Run status",
-                        run.state,
-                    )
-                    return None
-                v = run.summary[use_k]
             elif f == "summary":
                 v = dict(run.summary)
                 v["status"] = str(run.state)
@@ -210,7 +180,10 @@ def query(
 
 
 def query_s(
-    query_str: str, proj_cfg: DictConfig, verbose=True, use_cached: bool = False
+    query_str: str,
+    proj_cfg: DictConfig,
+    verbose=True,
+    use_cached: bool = False,
 ):
 
     select_s, filter_s = query_str.split(" WHERE ")
@@ -246,4 +219,16 @@ if __name__ == "__main__":
     proj_cfg = OmegaConf.load(args.cfg)
 
     result = query_s(query_args, proj_cfg, use_cached=args.cache, verbose=False)
+    result_summary = {}
+    keys = list(result[0].keys())
+    for k in keys:
+        values = [r[k] for r in result]
+        if isinstance(values[0], float):
+            result_summary[f"{k} (mean, std)"] = (
+                np.mean(values),
+                np.std(values),
+            )
+
     pprint(result)
+    if len(result_summary) > 0:
+        pprint(result_summary)

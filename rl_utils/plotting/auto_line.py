@@ -8,7 +8,7 @@ import pandas as pd
 import seaborn as sns
 from omegaconf import OmegaConf
 
-from rl_utils.plotting.utils import combine_dicts_to_df, nice_fig_save
+from rl_utils.plotting.utils import combine_dicts_to_df, fig_save
 from rl_utils.plotting.wb_query import batch_query
 
 MARKER_ORDER = ["^", "<", "v", "d", "s", "x", "o", ">"]
@@ -387,4 +387,4 @@ if __name__ == "__main__":
 
     df = combine_dicts_to_df(result, query_k)
     fig = line_plot(df, "_step", cfg.plot_key, "rank", "method", **cfg.plot_params)
-    nice_fig_save("data/vis", cfg.save_name, fig)
+    fig_save("data/vis", cfg.save_name, fig)

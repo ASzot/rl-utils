@@ -20,3 +20,9 @@ plot_params:
     "dist_to_goal": "Distance To Goal"
     "mirl": "Meta-IRL"
 ```
+
+# W&B Query
+Selectable fields:
+
+- `summary`: The metrics for the model at the end of training. Also the run state. Useful if you want to check run result.
+- Any other key: If the key is none of the above, then it will get the relevant key from the `summary` dict in the run (the final value).

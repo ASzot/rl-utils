@@ -2,9 +2,12 @@
 A library of helper functions, environment helpers, and experiment management functions for RL research.
 * `envs` utility to setup vectorized environments.
     * `envs/pointmass` A toy navigation task implemented in PyTorch.
-* `logging` run CLI, Wandb, or Tensorboard logging.
+* `logging` Weights&Biases, CLI, or Tensorboard logging interfaces.
 * `models` useful model components for RL policy networks.
 * `common`  helpers to manipulate observation and action spaces, standardize policy evaluation, and help with visualizing policy rollouts.
+* `plotting`
+    * `wb_query`: CLI for extracting information from Weights&Biases.
+
 
 # Installation
 Requires Python >= 3.7.

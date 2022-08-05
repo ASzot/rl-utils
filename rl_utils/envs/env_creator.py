@@ -12,6 +12,11 @@ from rl_utils.envs.vec_env.vec_env import VecEnv
 from rl_utils.envs.vec_env.vec_monitor import VecMonitor
 from rl_utils.envs.wrappers import TimeLimitMask, VecPyTorch, VecPyTorchFrameStack
 
+try:
+    import habitat.utils.gym_definitions  # noqa: F401
+except ImportError:
+    pass
+
 
 def create_vectorized_envs(
     env_id: str,

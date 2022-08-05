@@ -9,6 +9,8 @@ try:
     import libtmux
 except ImportError:
     libtmux = None
+import shlex
+
 from omegaconf import OmegaConf
 
 from rl_utils.plotting.wb_query import query_s
@@ -25,7 +27,10 @@ def get_arg_parser():
         help="tmux session id to connect to. If unspec will run in current window",
     )
     parser.add_argument(
-        "--sess-name", default=None, type=str, help="tmux session name to connect to"
+        "--sess-name",
+        default=None,
+        type=str,
+        help="tmux session name to connect to",
     )
     parser.add_argument("--proj-dat", type=str, default=None)
     parser.add_argument(
@@ -33,6 +38,11 @@ def get_arg_parser():
         type=str,
         default=None,
         help="If not assigned then a randomly assigned one is generated.",
+    )
+    parser.add_argument(
+        "--name-prefix",
+        type=str,
+        default=None,
     )
     parser.add_argument(
         "--run-single",
@@ -61,6 +71,13 @@ def get_arg_parser():
     # SLURM OPTIONS
     parser.add_argument("--comment", type=str, default=None)
     parser.add_argument(
+        "--slurm",
+        action="store_true",
+        help="""
+            If specified, will use slurm defaults.
+        """,
+    )
+    parser.add_argument(
         "--slurm-no-batch",
         action="store_true",
         help="""
@@ -81,9 +98,7 @@ def get_arg_parser():
             SLURM optimized for maximum CPU usage.
             """,
     )
-    parser.add_argument(
-        "--st", type=str, default=None, help="Slum parition type [long, short]"
-    )
+    parser.add_argument("--st", type=str, default=None, help="Slum parition type.")
     parser.add_argument(
         "--time",
         type=str,
@@ -95,7 +110,7 @@ def get_arg_parser():
     parser.add_argument(
         "--c",
         type=str,
-        default="7",
+        default=None,
         help="""
             Number of cpus for SLURM job
             """,
@@ -125,7 +140,7 @@ def add_on_args(spec_args):
     return " ".join(spec_args)
 
 
-def get_cmds(rest, args):
+def get_cmds(rest):
     cmd = rest[0]
     if len(rest) > 1:
         rest = " ".join(rest[1:])
@@ -180,6 +195,8 @@ def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg):
     g = as_list(args.g, num_cmds)
     c = as_list(args.c, num_cmds)
     ident = get_random_id()
+    if args.name_prefix is not None:
+        ident = args.name_prefix + "_" + ident
     log_file = osp.join(RUNS_DIR, ident) + ".log"
     cmd = cmd.replace("$SLURM_ID", ident)
 
@@ -269,11 +286,26 @@ def split_cmd(cmd):
     return [" ".join(ret_cmd) for ret_cmd in ret_cmds]
 
 
+def sub_in_args(old_cmd: str, new_args: str):
+    old_parts = shlex.split(old_cmd, posix=False)
+    new_parts = shlex.split(new_args, posix=False)
+
+    i = 0
+    while i < len(new_parts):
+        if new_parts[i] in old_parts:
+            old_i = old_parts.index(new_parts[i])
+            old_parts[old_i + 1] = new_parts[i + 1]
+        else:
+            old_parts.extend(new_parts[i : i + 2])
+        i += 2
+    return " ".join(old_parts)
+
+
 def execute_command_file(run_cmd, args, proj_cfg):
     if not osp.exists(RUNS_DIR):
         os.makedirs(RUNS_DIR)
 
-    cmds = get_cmds(run_cmd, args)
+    cmds = get_cmds(run_cmd)
 
     # Sub in W&B args
     cmds = [c for cmd in cmds for c in sub_wb_query(cmd, args, proj_cfg)]
@@ -283,15 +315,15 @@ def execute_command_file(run_cmd, args, proj_cfg):
 
     n_cmds = len(cmds)
 
+    add_all = proj_cfg.get("add_all", None)
+    if add_all is not None:
+        cmds = [cmd + " " + add_all for cmd in cmds]
+
     # Add on the project data
     if args.proj_dat is not None:
         proj_data = proj_cfg.get("proj_data", {})
         for k in args.proj_dat.split(","):
-            cmds = [cmd + " " + proj_data[k] for cmd in cmds]
-
-    add_all = proj_cfg.get("add_all", None)
-    if add_all is not None:
-        cmds = [cmd + " " + add_all for cmd in cmds]
+            cmds = [sub_in_args(cmd, proj_data[k]) for cmd in cmds]
 
     # Sub in variables
     if "base_data_dir" in proj_cfg:
@@ -474,5 +506,21 @@ def full_execute_command_file():
         proj_cfg = {}
     else:
         proj_cfg = OmegaConf.load(args.cfg)
+    if args.slurm and "slurm_defaults" in proj_cfg:
+        slurm_cfg = proj_cfg["slurm_defaults"]
+        if args.c is None and "c" in slurm_cfg:
+            args.c = slurm_cfg["c"]
+
+        if args.time is None and "time" in slurm_cfg:
+            args.time = slurm_cfg["time"]
+
+        if args.time is None and "time" in slurm_cfg:
+            args.time = slurm_cfg["time"]
+
+        if args.st is None and "st" in slurm_cfg:
+            args.st = slurm_cfg["st"]
+
+    if args.c is None:
+        args.c = "7"
 
     execute_command_file(rest, args, proj_cfg)

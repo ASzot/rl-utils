@@ -106,10 +106,10 @@ class Evaluator:
 
         torch.save(
             {
-                "obs": obs,
+                "observations": obs,
                 "actions": actions,
                 "rewards": rewards,
-                "masks": (~terminals.bool()).float(),
+                "terminals": terminals.float(),
                 "infos": self._all_traj_info,
             },
             self._save_traj_name,
@@ -144,29 +144,29 @@ class Evaluator:
             num_render = num_episodes
         else:
             num_render = self._num_render
+        with torch.no_grad():
+            while sum(num_evals) != 0:
+                act_data = policy.act(obs, rnn_hxs, eval_masks, is_eval=True)
+                next_obs, rewards, done, info = self._envs.step(act_data["actions"])
+                rnn_hxs = act_data["hxs"]
 
-        while sum(num_evals) != 0:
-            act_data = policy.act(obs, rnn_hxs, eval_masks, deterministic=True)
-            next_obs, rewards, done, info = self._envs.step(act_data["actions"])
-            rnn_hxs = act_data["hxs"]
+                if total_evaluated < num_render:
+                    frames = self._envs.render(mode="rgb_array")
+                    all_frames.append(frames)
 
-            if total_evaluated < num_render:
-                frames = self._envs.render(mode="rgb_array")
-                all_frames.append(frames)
+                for env_i in range(num_envs):
+                    self._add_transition_to_save(
+                        env_i, obs, act_data["actions"], rewards, done, info
+                    )
 
-            for env_i in range(num_envs):
-                self._add_transition_to_save(
-                    env_i, obs, act_data["actions"], rewards, done, info
-                )
-
-                if done[env_i]:
-                    total_evaluated += 1
-                    if num_evals[env_i] > 0:
-                        self._flush_trajectory_to_save(env_i)
-                        for k, v in compress_and_filter_dict(info[env_i]).items():
-                            accum_stats[k].append(v)
-                        num_evals[env_i] -= 1
-            obs = next_obs
+                    if done[env_i]:
+                        total_evaluated += 1
+                        if num_evals[env_i] > 0:
+                            self._flush_trajectory_to_save(env_i)
+                            for k, v in compress_and_filter_dict(info[env_i]).items():
+                                accum_stats[k].append(v)
+                            num_evals[env_i] -= 1
+                obs = next_obs
 
         if len(all_frames) > 0:
             save_mp4(all_frames, self._vid_dir, f"eval_{eval_i}", self._fps)
