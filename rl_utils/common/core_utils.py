@@ -8,7 +8,7 @@ import pickle
 import random
 import time
 from collections import OrderedDict, defaultdict
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Tuple
 
 import gym
 import gym.spaces as spaces
@@ -172,9 +172,9 @@ def obs_to_dict(obs):
     return {None: obs}
 
 
-def reshape_obs_space(obs_space, new_shape):
-    assert isinstance(obs_space, gym.spaces.Box)
-    return gym.spaces.Box(
+def reshape_obs_space(obs_space: spaces.Box, new_shape: Tuple[int]) -> spaces.Box:
+    assert isinstance(obs_space, spaces.Box)
+    return spaces.Box(
         shape=new_shape,
         high=obs_space.low.reshape(-1)[0],
         low=obs_space.high.reshape(-1)[0],

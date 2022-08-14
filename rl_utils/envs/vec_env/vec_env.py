@@ -155,13 +155,11 @@ class VecEnvWrapper(VecEnv):
     def step_async(self, actions):
         self.venv.step_async(actions)
 
-    @abstractmethod
     def reset(self):
-        pass
+        return self.venv.reset()
 
-    @abstractmethod
     def step_wait(self):
-        pass
+        return self.venv.step_wait()
 
     def close(self):
         return self.venv.close()

@@ -324,6 +324,9 @@ def execute_command_file(run_cmd, args, proj_cfg):
         proj_data = proj_cfg.get("proj_data", {})
         for k in args.proj_dat.split(","):
             cmds = [sub_in_args(cmd, proj_data[k]) for cmd in cmds]
+            env_var_dat = proj_cfg.get("proj_dat_add_env_vars", {}).get(k, None)
+            if env_var_dat is not None:
+                cmds = [env_var_dat + " " + cmd for cmd in cmds]
 
     # Sub in variables
     if "base_data_dir" in proj_cfg:
