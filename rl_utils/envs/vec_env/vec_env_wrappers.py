@@ -1,6 +1,5 @@
 import gym.spaces as spaces
 import torch
-from gym import spaces
 
 import rl_utils.common as cutils
 
@@ -33,5 +32,4 @@ class VecEnvPermuteFrames(VecEnvObservationWrapper):
         VecEnvWrapper.__init__(self, venv, observation_space=obs_space)
 
     def process(self, obs):
-        obs = obs.permute(0, 3, 1, 2)
-        return obs
+        return obs.permute(0, 3, 1, 2)
