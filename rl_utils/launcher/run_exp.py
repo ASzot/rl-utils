@@ -72,10 +72,8 @@ def get_arg_parser():
     parser.add_argument("--comment", type=str, default=None)
     parser.add_argument(
         "--slurm",
-        action="store_true",
-        help="""
-            If specified, will use slurm defaults.
-        """,
+        type=str,
+        default=None,
     )
     parser.add_argument(
         "--slurm-no-batch",
@@ -98,7 +96,9 @@ def get_arg_parser():
             SLURM optimized for maximum CPU usage.
             """,
     )
-    parser.add_argument("--st", type=str, default=None, help="Slum parition type.")
+    parser.add_argument(
+        "--partition", type=str, default=None, help="Slum parition type."
+    )
     parser.add_argument(
         "--time",
         type=str,
@@ -116,6 +116,11 @@ def get_arg_parser():
             """,
     )
     parser.add_argument(
+        "--constraint",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
         "--g",
         type=str,
         default="1",
@@ -126,7 +131,7 @@ def get_arg_parser():
     parser.add_argument(
         "--ntasks",
         type=str,
-        default="1",
+        default=None,
         help="""
             Number of processes for SLURM job
             """,
@@ -191,16 +196,19 @@ def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg):
     python_path = osp.join(osp.expanduser("~"), "miniconda3", "envs", conda_env, "bin")
     python_path = proj_cfg.get("conda_path", python_path)
 
-    ntasks = as_list(args.ntasks, num_cmds)
     g = as_list(args.g, num_cmds)
     c = as_list(args.c, num_cmds)
+    if args.ntasks is None:
+        ntasks = g[:]
+    else:
+        ntasks = as_list(args.ntasks, num_cmds)
     ident = get_random_id()
     if args.name_prefix is not None:
         ident = args.name_prefix + "_" + ident
     log_file = osp.join(RUNS_DIR, ident) + ".log"
     cmd = cmd.replace("$SLURM_ID", ident)
 
-    if args.st is None:
+    if args.partition is None:
         env_vars = " ".join(proj_cfg["add_env_vars"])
         return f"{env_vars} {cmd}"
     else:
@@ -211,7 +219,7 @@ def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg):
                 ident,
                 python_path,
                 cmd,
-                args.st,
+                args.partition,
                 ntasks[cmd_idx],
                 g[cmd_idx],
                 c[cmd_idx],
@@ -222,7 +230,7 @@ def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg):
         else:
             srun_settings = (
                 f"--gres=gpu:{args.g} "
-                + f"-p {args.st} "
+                + f"-p {args.partition} "
                 + f"-c {args.c} "
                 + f"-J {ident} "
                 + f"-o {log_file}"
@@ -317,7 +325,7 @@ def execute_command_file(run_cmd, args, proj_cfg):
 
     add_all = proj_cfg.get("add_all", None)
     if add_all is not None:
-        cmds = [cmd + " " + add_all for cmd in cmds]
+        cmds = [sub_in_args(cmd, add_all) for cmd in cmds]
 
     # Add on the project data
     if args.proj_dat is not None:
@@ -366,7 +374,7 @@ def execute_command_file(run_cmd, args, proj_cfg):
     cd = as_list(args.cd, n_cmds)
 
     if args.sess_id == -1 and args.sess_name is None:
-        if args.st is not None:
+        if args.partition is not None:
             for cmd_idx, cmd in enumerate(cmds):
                 run_cmd = get_cmd_run_str(cmd, args, cmd_idx, n_cmds, proj_cfg)
                 log(f"Running {run_cmd}", args)
@@ -400,7 +408,7 @@ def execute_command_file(run_cmd, args, proj_cfg):
             run_cmd = get_cmd_run_str(cmd, args, cmd_idx, n_cmds, proj_cfg)
 
             # Send the keys to run the command
-            if args.st is None:
+            if args.partition is None:
                 last_pane = new_window.attached_pane
                 last_pane.send_keys(run_cmd, enter=False)
                 pane = new_window.split_window(attach=False)
@@ -426,7 +434,7 @@ def execute_command_file(run_cmd, args, proj_cfg):
 
 
 def generate_slurm_batch_file(
-    log_file, ident, python_path, cmd, st, ntasks, g, c, args, proj_cfg
+    log_file, ident, python_path, cmd, partition, ntasks, g, c, args, proj_cfg
 ):
     ignore_nodes_s = ",".join(proj_cfg.get("slurm_ignore_nodes", []))
     if len(ignore_nodes_s) != 0:
@@ -437,6 +445,8 @@ def generate_slurm_batch_file(
         add_options.append(f"#SBATCH --time={args.time}")
     if args.comment is not None:
         add_options.append(f'#SBATCH --comment="{args.comment}"')
+    if args.constraint is not None:
+        add_options.append(f"#SBATCH --constraint={args.constraint}")
     add_options = "\n".join(add_options)
 
     python_parts = cmd.split("python")
@@ -490,7 +500,7 @@ srun %s"""
         cpu_options,
         int(ntasks),
         requeue_s,
-        st,
+        partition,
         add_options,
         args.mp_offset,
         env_vars,
@@ -509,19 +519,20 @@ def full_execute_command_file():
         proj_cfg = {}
     else:
         proj_cfg = OmegaConf.load(args.cfg)
-    if args.slurm and "slurm_defaults" in proj_cfg:
-        slurm_cfg = proj_cfg["slurm_defaults"]
-        if args.c is None and "c" in slurm_cfg:
-            args.c = slurm_cfg["c"]
+    slurm_cfg = proj_cfg.get("slurm", {})
+    if args.slurm is not None:
+        def_slurm = slurm_cfg[args.slurm]
+        if args.c is None and "c" in def_slurm:
+            args.c = def_slurm["c"]
 
-        if args.time is None and "time" in slurm_cfg:
-            args.time = slurm_cfg["time"]
+        if args.time is None and "time" in def_slurm:
+            args.time = def_slurm["time"]
 
-        if args.time is None and "time" in slurm_cfg:
-            args.time = slurm_cfg["time"]
+        if args.partition is None and "partition" in def_slurm:
+            args.partition = def_slurm["partition"]
 
-        if args.st is None and "st" in slurm_cfg:
-            args.st = slurm_cfg["st"]
+        if args.constraint is None and "constraint" in def_slurm:
+            args.constraint = def_slurm["constraint"]
 
     if args.c is None:
         args.c = "7"

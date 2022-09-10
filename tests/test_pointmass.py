@@ -1,7 +1,11 @@
 import torch
 
 from rl_utils.envs import create_vectorized_envs
-from rl_utils.envs.pointmass import PointMassObstacleParams, PointMassParams
+from rl_utils.envs.pointmass import (
+    PointMassObstacleParams,
+    PointMassParams,
+    SquareObstacle,
+)
 
 
 def test_create():
@@ -20,7 +24,9 @@ def test_examples():
     envs = create_vectorized_envs("PointMass-v0", num_envs=32)
 
     envs = create_vectorized_envs(
-        "PointMass-v0", num_envs=32, params=PointMassParams(dt=0.1, ep_horizon=10)
+        "PointMass-v0",
+        num_envs=32,
+        params=PointMassParams(dt=0.1, ep_horizon=10),
     )
 
     envs = create_vectorized_envs("PointMassObstacle-v0", num_envs=32)
@@ -34,7 +40,9 @@ def test_examples():
         "PointMassObstacle-v0",
         num_envs=32,
         params=PointMassObstacleParams(
-            dt=0.1, ep_horizon=10, square_obstacles=[([0.5, 0.5], 0.11, 0.5, 45.0)]
+            dt=0.1,
+            ep_horizon=10,
+            square_obstacles=[SquareObstacle((0.5, 0.5), 0.11, 0.5, 45.0)],
         ),
     )
     envs.reset()
