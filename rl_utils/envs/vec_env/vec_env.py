@@ -2,6 +2,8 @@ import contextlib
 import os
 from abc import ABC, abstractmethod
 
+import cloudpickle
+
 from rl_utils.common.tile_images import tile_images
 
 FINAL_OBS_KEY = "final_obs"
@@ -153,13 +155,11 @@ class VecEnvWrapper(VecEnv):
     def step_async(self, actions):
         self.venv.step_async(actions)
 
-    @abstractmethod
     def reset(self):
-        pass
+        return self.venv.reset()
 
-    @abstractmethod
     def step_wait(self):
-        pass
+        return self.venv.step_wait()
 
     def close(self):
         return self.venv.close()
@@ -187,21 +187,17 @@ class VecEnvObservationWrapper(VecEnvWrapper):
 
 class CloudpickleWrapper:
     """
-    Uses cloudpickle to serialize contents (otherwise multiprocessing tries to use pickle)
+    Uses cloudpickle to serialize contents
     """
 
     def __init__(self, x):
         self.x = x
 
     def __getstate__(self):
-        import cloudpickle
-
         return cloudpickle.dumps(self.x)
 
     def __setstate__(self, ob):
-        import pickle
-
-        self.x = pickle.loads(ob)
+        self.x = cloudpickle.loads(ob)
 
 
 @contextlib.contextmanager

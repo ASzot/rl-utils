@@ -2,14 +2,13 @@
 Helpers for dealing with vectorized environments.
 """
 
-import hashlib
 import os
 import os.path as osp
 import pickle
 import random
 import time
 from collections import OrderedDict, defaultdict
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Tuple
 
 import gym
 import gym.spaces as spaces
@@ -28,11 +27,56 @@ def set_seed(seed: int) -> None:
     random.seed(seed)
 
 
+def dict_sel(d: Dict[Any, List[Any]], idx: int) -> Dict[Any, Any]:
+    ret_dict = {}
+    for k in d:
+        ret_dict[k] = d[k][idx]
+    return ret_dict
+
+
+def apply_to_dict(d: Dict[Any, List[Any]], fn: Callable[[Any], Any]) -> Dict[Any, Any]:
+    ret_dict = {}
+    for k in d:
+        ret_dict[k] = fn(d[k])
+    return ret_dict
+
+
+def transpose_list_dict(arr: List[Dict]) -> Dict[Any, Any]:
+    keys = arr[0].keys()
+    ret_d = {k: [] for k in keys}
+    for arr_ele in arr:
+        for k in keys:
+            ret_d[k].append(arr_ele[k])
+
+    for k in keys:
+        if isinstance(ret_d[k][0], torch.Tensor):
+            ret_d[k] = torch.stack(ret_d[k])
+
+    return ret_d
+
+
+def transpose_dict_list(d: Dict[Any, Any]) -> List[Dict]:
+    keys = list(d.keys())
+    lens = [len(d[k]) for k in d]
+    if len(set(lens)) != 1:
+        raise ValueError("All lists must have equal sizes")
+
+    # Assumes that all the lists are equal length.
+    ret = []
+    for i in range(lens[0]):
+        ret.append({k: d[k][i] for k in keys})
+    return ret
+
+
 def group_trajectories(
     dones: torch.Tensor, **other_data: Dict[str, torch.Tensor]
 ) -> List[Dict[str, torch.Tensor]]:
     """
-    :param dones: An (N, 1) tensor
+    Takes flat lists of data and groups them according to when dones=0. Used to
+    go from a list of transitions to a list of trajectories.
+
+    :param dones: An (N, 1) tensor where "False" or "0" value indicates when to
+        stop the group.
     """
     for k, v in other_data.items():
         if v.size(0) != dones.size(0):
@@ -128,9 +172,9 @@ def obs_to_dict(obs):
     return {None: obs}
 
 
-def reshape_obs_space(obs_space, new_shape):
-    assert isinstance(obs_space, gym.spaces.Box)
-    return gym.spaces.Box(
+def reshape_obs_space(obs_space: spaces.Box, new_shape: Tuple[int]) -> spaces.Box:
+    assert isinstance(obs_space, spaces.Box)
+    return spaces.Box(
         shape=new_shape,
         high=obs_space.low.reshape(-1)[0],
         low=obs_space.high.reshape(-1)[0],
@@ -231,13 +275,10 @@ def get_size_for_space(space: spaces.Space) -> int:
 class CacheHelper:
     CACHE_PATH = "./data/cache"
 
-    def __init__(self, cache_name, lookup_val, def_val=None, verbose=False, rel_dir=""):
+    def __init__(self, cache_name, def_val=None, verbose=False, rel_dir=""):
         self.use_cache_path = osp.join(CacheHelper.CACHE_PATH, rel_dir)
-        if not osp.exists(self.use_cache_path):
-            os.makedirs(self.use_cache_path)
-        sec_hash = hashlib.md5(str(lookup_val).encode("utf-8")).hexdigest()
-        cache_id = f"{cache_name}_{sec_hash}.pickle"
-        self.cache_id = osp.join(self.use_cache_path, cache_id)
+        os.makedirs(self.use_cache_path, exist_ok=True)
+        self.cache_id = osp.join(self.use_cache_path, f"{cache_name}.pickle")
         self.def_val = def_val
         self.verbose = verbose
 
@@ -256,7 +297,10 @@ class CacheHelper:
                     raise e
                 # try again soon
                 print(
-                    "Cache size is ", osp.getsize(self.cache_id), "for ", self.cache_id
+                    "Cache size is ",
+                    osp.getsize(self.cache_id),
+                    "for ",
+                    self.cache_id,
                 )
                 time.sleep(1.0 + np.random.uniform(0.0, 1.0))
                 return self.load(load_depth + 1)

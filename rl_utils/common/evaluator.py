@@ -22,14 +22,17 @@ class Evaluator:
         self,
         envs: VecEnv,
         rnn_hxs_dim: int,
-        num_render: Optional[int],
-        vid_dir: str,
-        fps: int,
+        num_render: Optional[int] = None,
+        vid_dir: str = "data/vids",
+        fps: int = 10,
         save_traj_name: Optional[str] = None,
         **kwargs,
     ):
         """
-        :param save_traj_name: The full file path (for example "data/trajs/data.pth") to save the evaluated trajectories to.
+        :param save_traj_name: The full file path (for example
+            "data/trajs/data.pth") to save the evaluated trajectories to.
+        :param num_render: If None then every episode will be rendered.
+        :param rnn_hxs_dim: The recurrent hidden state dimension.
         """
         self._envs = envs
         self._rnn_hxs_dim = rnn_hxs_dim
@@ -106,7 +109,7 @@ class Evaluator:
                 "observations": obs,
                 "actions": actions,
                 "rewards": rewards,
-                "terminals": terminals,
+                "terminals": terminals.float(),
                 "infos": self._all_traj_info,
             },
             self._save_traj_name,
@@ -141,29 +144,29 @@ class Evaluator:
             num_render = num_episodes
         else:
             num_render = self._num_render
+        with torch.no_grad():
+            while sum(num_evals) != 0:
+                act_data = policy.act(obs, rnn_hxs, eval_masks, is_eval=True)
+                next_obs, rewards, done, info = self._envs.step(act_data["actions"])
+                rnn_hxs = act_data["hxs"]
 
-        while sum(num_evals) != 0:
-            act_data = policy.act(obs, rnn_hxs, eval_masks, deterministic=True)
-            next_obs, rewards, done, info = self._envs.step(act_data["action"])
-            rnn_hxs = act_data["recurrent_hidden_states"]
+                if total_evaluated < num_render:
+                    frames = self._envs.render(mode="rgb_array")
+                    all_frames.append(frames)
 
-            if total_evaluated < num_render:
-                frames = self._envs.render(mode="rgb_array")
-                all_frames.append(frames)
+                for env_i in range(num_envs):
+                    self._add_transition_to_save(
+                        env_i, obs, act_data["actions"], rewards, done, info
+                    )
 
-            for env_i in range(num_envs):
-                self._add_transition_to_save(
-                    env_i, obs, act_data["action"], rewards, done, info
-                )
-
-                if done[env_i]:
-                    total_evaluated += 1
-                    if num_evals[env_i] > 0:
-                        self._flush_trajectory_to_save(env_i)
-                        for k, v in compress_and_filter_dict(info[env_i]).items():
-                            accum_stats[k].append(v)
-                        num_evals[env_i] -= 1
-            obs = next_obs
+                    if done[env_i]:
+                        total_evaluated += 1
+                        if num_evals[env_i] > 0:
+                            self._flush_trajectory_to_save(env_i)
+                            for k, v in compress_and_filter_dict(info[env_i]).items():
+                                accum_stats[k].append(v)
+                            num_evals[env_i] -= 1
+                obs = next_obs
 
         if len(all_frames) > 0:
             save_mp4(all_frames, self._vid_dir, f"eval_{eval_i}", self._fps)

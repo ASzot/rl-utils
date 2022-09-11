@@ -9,19 +9,24 @@ from rl_utils.envs.registry import full_env_registry
 
 
 @dataclass(frozen=True)
-class PointMassObstacleParams(PointMassParams):
+class SquareObstacle:
     """
-    :param square_obstacles: A list of obstacles where each obstacle is defined by a tuple with:
-        * x,y position
-        * Obstacle width
-        * Obstacle length
-        * Obstacle rotation angle (in degrees)
+    * x,y position of the CENTER of the square.
+    * Obstacle width
+    * Obstacle length
+    * Obstacle rotation angle (in degrees)
     """
 
+    xy: Tuple[float, float]
+    width: float
+    height: float
+    rot_deg: float
+
+
+@dataclass(frozen=True)
+class PointMassObstacleParams(PointMassParams):
     goal_thresh: float = 0.05
-    square_obstacles: List[Tuple[Tuple[float, float], float, float, float]] = field(
-        default_factory=list
-    )
+    square_obstacles: List[SquareObstacle] = field(default_factory=list)
 
 
 @full_env_registry.register_env("PointMassObstacle-v0")
@@ -41,8 +46,8 @@ class PointMassObstacleEnv(PointMassEnv):
         self._circle_obs = []
         self._square_obs_T = []
 
-        for ob_pos, x_len, y_len, rot in self._params.square_obstacles:
-            rot = rot * (np.pi / 180.0)
+        for obs in self._params.square_obstacles:
+            rot = obs.rot_deg * (np.pi / 180.0)
 
             rot_T = torch.tensor(
                 [
@@ -55,8 +60,8 @@ class PointMassObstacleEnv(PointMassEnv):
             )
             trans_T = torch.tensor(
                 [
-                    [1.0, 0.0, ob_pos[0]],
-                    [0.0, 1.0, ob_pos[1]],
+                    [1.0, 0.0, obs.xy[0]],
+                    [0.0, 1.0, obs.xy[1]],
                     [0.0, 0.0, 1.0],
                 ],
                 device=self._device,
@@ -66,8 +71,8 @@ class PointMassObstacleEnv(PointMassEnv):
             self._square_obs_T.append(
                 (
                     trans_T @ rot_T,
-                    x_len,
-                    y_len,
+                    obs.width,
+                    obs.height,
                 )
             )
 
@@ -84,7 +89,9 @@ class PointMassObstacleEnv(PointMassEnv):
 
         if self._params.clip_bounds:
             new_pos = torch.clamp(
-                new_pos, -self._params.position_limit, self._params.position_limit
+                new_pos,
+                -self._params.position_limit,
+                self._params.position_limit,
             )
 
         for ob_pos, ob_radius in self._circle_obs:
@@ -117,8 +124,12 @@ class PointMassObstacleEnv(PointMassEnv):
         for obs_T, xlen, ylen in self._square_obs_T:
             local_pos = torch.linalg.inv(obs_T) @ homo_pos.T
 
-            inside_x = torch.logical_and(local_pos[0] < xlen, local_pos[0] > -xlen)
-            inside_y = torch.logical_and(local_pos[1] < ylen, local_pos[1] > -ylen)
+            inside_x = torch.logical_and(
+                local_pos[0] < (xlen / 2), local_pos[0] > -(xlen / 2)
+            )
+            inside_y = torch.logical_and(
+                local_pos[1] < (ylen / 2), local_pos[1] > -(ylen / 2)
+            )
             inside_box = torch.logical_and(inside_x, inside_y)
             inside_any_box |= inside_box
         return inside_any_box

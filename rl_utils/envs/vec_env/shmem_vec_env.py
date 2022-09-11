@@ -50,7 +50,8 @@ class ShmemVecEnv(VecEnv):
         self.obs_bufs = [
             {
                 k: ctx.Array(
-                    _NP_TO_CT[self.obs_dtypes[k].type], int(np.prod(self.obs_shapes[k]))
+                    _NP_TO_CT[self.obs_dtypes[k].type],
+                    int(np.prod(self.obs_shapes[k])),
                 )
                 for k in self.obs_keys
             }
@@ -169,8 +170,6 @@ def _subproc_worker(
                 obs, reward, done, info = env.step(data)
                 if done:
                     final_obs = obs
-                    if isinstance(obs, dict):
-                        final_obs = obs["observation"]
                     info[FINAL_OBS_KEY] = final_obs
                     obs = env.reset()
                 pipe.send((_write_obs(obs), reward, done, info))

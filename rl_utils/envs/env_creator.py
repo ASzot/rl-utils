@@ -4,12 +4,22 @@ from typing import Callable, Optional
 import gym
 import torch
 
+import rl_utils.envs.pointmass  # noqa: F401
 from rl_utils.envs.registry import full_env_registry
 from rl_utils.envs.vec_env.dummy_vec_env import DummyVecEnv
 from rl_utils.envs.vec_env.shmem_vec_env import ShmemVecEnv
 from rl_utils.envs.vec_env.vec_env import VecEnv
+from rl_utils.envs.vec_env.vec_env_wrappers import (
+    VecEnvClipActions,
+    VecEnvPermuteFrames,
+)
 from rl_utils.envs.vec_env.vec_monitor import VecMonitor
 from rl_utils.envs.wrappers import TimeLimitMask, VecPyTorch, VecPyTorchFrameStack
+
+try:
+    import habitat.utils.gym_definitions  # noqa: F401
+except ImportError:
+    pass
 
 
 def create_vectorized_envs(
@@ -22,6 +32,8 @@ def create_vectorized_envs(
     create_env_fn: Optional[Callable[[int], None]] = None,
     force_multi_proc: bool = False,
     num_frame_stack: Optional[int] = None,
+    clip_actions: bool = False,
+    permute_frames: bool = False,
     **kwargs,
 ) -> VecEnv:
     found_full_env_cls = full_env_registry.search_env(env_id)
@@ -54,6 +66,11 @@ def create_vectorized_envs(
 
     envs = VecMonitor(envs)
     envs = VecPyTorch(envs, device)
+
+    if permute_frames:
+        envs = VecEnvPermuteFrames(envs)
+    if clip_actions:
+        envs = VecEnvClipActions(envs)
 
     if num_frame_stack is not None:
         return VecPyTorchFrameStack(envs, num_frame_stack, device)

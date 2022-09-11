@@ -21,6 +21,8 @@ class PointMassParams:
     :param custom_reward: A function that takes as input the current position,
         previous position, and action  and outputs a reward value. All are PyTorch
         tensors of shape (N,) where N is the number of environments.
+    :param random_start_region_sample: If False, then the starting state will
+        iterate clockwise around the possible spawning regions.
     """
 
     force_eval_start_dist: bool = False
@@ -113,7 +115,9 @@ class PointMassEnv(VecEnv):
 
         if self._params.clip_bounds:
             new_pos = torch.clamp(
-                new_pos, -self._params.position_limit, self._params.position_limit
+                new_pos,
+                -self._params.position_limit,
+                self._params.position_limit,
             )
         return new_pos
 

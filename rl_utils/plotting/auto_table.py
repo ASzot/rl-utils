@@ -1,52 +1,8 @@
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional
 
 import pandas as pd
-from rlf.exp_mgr.wb_query import query
 
-MISSING_VALUE = 0.2444
-
-
-def get_df_for_table_txt(
-    table_txt: str, lookup_k: str
-) -> Tuple[pd.DataFrame, List[str], List[str]]:
-    """
-    Extracts a dataframe to use for `plot_table` automatically from text copied
-    from excel. You want to include the row and column names in the text.
-    Example:
-    ```
-            mirl train	mirl eval	airl train	airl eval
-    100	5TK1	UKGZ	YIGE	GN31
-    50	14MT	C0JW	KUOP	OVS2
-    ```
-    If you are getting eval metrics, `lookup_k` should likely be 'final_train_success'.
-    """
-    data = []
-    row_headers = []
-    for line in table_txt.split("\n"):
-        if line.strip() == "":
-            continue
-        line_parts = line.split("\t")
-        row_ident = line_parts[0].strip()
-        if row_ident == "":
-            # These are the column headers.
-            col_headers = line_parts[1:]
-        else:
-            assert len(line_parts[1:]) == len(col_headers)
-            row_headers.append(row_ident)
-            for group, col in zip(line_parts[1:], col_headers):
-                r = query([lookup_k], {"group": group}, use_cached=True)
-                if r is None or len(r) == 0:
-                    r = [{lookup_k: MISSING_VALUE}]
-
-                for d in r:
-                    data.append(
-                        {"method": row_ident, "type": col, lookup_k: d[lookup_k]}
-                    )
-    return pd.DataFrame(data), col_headers, row_headers
-
-
-def def_make_col_header(n_cols):
-    return "c" * n_cols
+from rl_utils.plotting.utils import MISSING_VALUE
 
 
 def plot_table(
@@ -62,7 +18,7 @@ def plot_table(
     missing_fill_value=MISSING_VALUE,
     error_fill_value=0.3444,
     get_row_highlight: Optional[Callable[[str, pd.DataFrame], Optional[str]]] = None,
-    make_col_header: Callable[[int], str] = def_make_col_header,
+    make_col_header: Optional[Callable[[int], str]] = None,
     x_label: str = "",
     y_label: str = "",
     skip_toprule: bool = False,
@@ -96,6 +52,10 @@ def plot_table(
     :param x_label: Renders another row of text on the top that spans all the columns.
     ;param y_label: Renders a side column with vertically rotated text that spawns all the rows.
     """
+    if make_col_header is None:
+
+        def make_col_header(n_cols):
+            return "c" * n_cols
 
     if renames is None:
         renames = {}
