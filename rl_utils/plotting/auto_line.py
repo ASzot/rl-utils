@@ -376,7 +376,7 @@ if __name__ == "__main__":
     query_k = "ALL_" + cfg.plot_key
 
     result = batch_query(
-        [[query_k] for i in cfg.methods],
+        [[query_k] for _ in cfg.methods],
         [{cfg.method_spec: v} for v in cfg.methods.values()],
         all_should_skip=[len(v) == 0 for v in cfg.methods.values()],
         all_add_info=[{"method": k} for k in cfg.methods.keys()],

@@ -1,4 +1,4 @@
-## Auto Plotter
+## Auto Line
 Run something like `python -m rl_utils.plotting.auto_line --cfg plot_cfgs/my_plot.yaml` where `plot_cfgs/my_plot.yaml` looks something like:
 ```
 methods:
@@ -19,6 +19,24 @@ plot_params:
     "_step": "Step"
     "dist_to_goal": "Distance To Goal"
     "mirl": "Meta-IRL"
+```
+Argument description:
+* `method_spec`: Key to group methods by. For example: `group` name.
+* `save_name`: No extension and no parent directory.
+* `methods`: Dict of names mapping to `method_spec` instances (for example group names).
+
+## Auto Bar
+Config Schema:
+```
+methods:
+  st_pop: K94569d43
+  im_pop: Rb2cd0028
+method_spec: "group"
+proj_cfg: "../../configs/hr.yaml"
+plot_key: "eval_reward/average_reward"
+save_name: "set_table"
+use_cached: False
+plot_params: {}
 ```
 
 # W&B Query
