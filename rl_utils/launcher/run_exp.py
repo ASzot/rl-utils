@@ -65,7 +65,6 @@ def get_arg_parser():
     parser.add_argument("--cfg", type=str, default=None)
 
     # MULTIPROC OPTIONS
-    parser.add_argument("--mp-offset", type=int, default=0)
     parser.add_argument("--pt-proc", type=int, default=-1)
 
     # SLURM OPTIONS
@@ -117,6 +116,11 @@ def get_arg_parser():
     )
     parser.add_argument(
         "--constraint",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
+        "--cpu-mem",
         type=str,
         default=None,
     )
@@ -240,7 +244,7 @@ def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg):
             return f"srun {srun_settings} {python_path}/{cmd}"
 
 
-def sub_wb_query(cmd, args, proj_cfg):
+def sub_wb_query(cmd, proj_cfg):
     parts = cmd.split("&")
     if len(parts) < 3:
         return [cmd]
@@ -316,7 +320,7 @@ def execute_command_file(run_cmd, args, proj_cfg):
     cmds = get_cmds(run_cmd)
 
     # Sub in W&B args
-    cmds = [c for cmd in cmds for c in sub_wb_query(cmd, args, proj_cfg)]
+    cmds = [c for cmd in cmds for c in sub_wb_query(cmd, proj_cfg)]
 
     # Split the commands.
     cmds = [c for cmd in cmds for c in split_cmd(cmd)]
@@ -351,7 +355,7 @@ def execute_command_file(run_cmd, args, proj_cfg):
     cmds = [cmd.replace("$WB_ENTITY", proj_cfg.wb_entity) for cmd in cmds]
 
     if args.pt_proc != -1:
-        pt_dist_str = f"MULTI_PROC_OFFSET={args.mp_offset} python -u -m torch.distributed.launch --use_env --nproc_per_node {args.pt_proc} "
+        pt_dist_str = f"torchrun --nproc_per_node {args.pt_proc} "
 
         def make_dist_cmd(x):
             parts = x.split(" ")
@@ -447,6 +451,8 @@ def generate_slurm_batch_file(
         add_options.append(f'#SBATCH --comment="{args.comment}"')
     if args.constraint is not None:
         add_options.append(f"#SBATCH --constraint={args.constraint}")
+    if args.cpu_mem is not None:
+        add_options.append(f"#SBATCH --mem-per-cpu={args.cpu_mem}")
     add_options = "\n".join(add_options)
 
     python_parts = cmd.split("python")
@@ -458,6 +464,15 @@ def generate_slurm_batch_file(
     if not args.skip_env:
         env_vars = proj_cfg.get("add_env_vars", [])
         env_vars = [f"export {x}" for x in env_vars]
+
+        if args.proj_dat is not None:
+            for k in args.proj_dat.split(","):
+                env_var_dat = proj_cfg.get("proj_dat_add_env_vars", {}).get(k, None)
+                if env_var_dat is not None:
+                    proj_env_vars = env_var_dat.split(" ")
+                    for proj_env_var in proj_env_vars:
+                        env_vars.append(f"export {proj_env_var}")
+
         env_vars = "\n".join(env_vars)
 
     cpu_options = "#SBATCH --cpus-per-task %i" % int(c)
@@ -484,10 +499,9 @@ def generate_slurm_batch_file(
 #SBATCH -p %s
 %s
 
-export MULTI_PROC_OFFSET=%i
+MAIN_ADDR=$(scontrol show hostnames "${SLURM_JOB_NODELIST}" | head -n 1)
+export MAIN_ADDR
 %s
-
-export MASTER_ADDR=$(srun --ntasks=1 hostname 2>&1 | tail -n1)
 
 set -x
 srun %s"""
@@ -502,7 +516,6 @@ srun %s"""
         requeue_s,
         partition,
         add_options,
-        args.mp_offset,
         env_vars,
         run_cmd,
     )
@@ -533,6 +546,9 @@ def full_execute_command_file():
 
         if args.constraint is None and "constraint" in def_slurm:
             args.constraint = def_slurm["constraint"]
+
+        if args.cpu_mem is None and "cpu_mem" in def_slurm:
+            args.cpu_mem = def_slurm["cpu_mem"]
 
     if args.c is None:
         args.c = "7"

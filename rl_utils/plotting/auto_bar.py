@@ -116,13 +116,15 @@ def plot_bar(
     return fig
 
 
-def plot_from_file(plot_cfg_path):
+def plot_from_file(plot_cfg_path, add_query_fields=None):
     cfg = OmegaConf.load(plot_cfg_path)
+    if add_query_fields is None:
+        add_query_fields = []
 
     query_k = cfg.plot_key
 
     result = batch_query(
-        [[query_k] for _ in cfg.methods],
+        [[query_k, *add_query_fields] for _ in cfg.methods],
         [{cfg.method_spec: v} for v in cfg.methods.values()],
         all_should_skip=[len(v) == 0 for v in cfg.methods.values()],
         all_add_info=[{"method": k} for k in cfg.methods.keys()],
@@ -133,16 +135,11 @@ def plot_from_file(plot_cfg_path):
     df = pd.DataFrame(result)
     fig = plot_bar(df, "method", query_k, **cfg.plot_params)
     fig_save("data/vis", cfg.save_name, fig)
-
-
-def get_arg_parser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--cfg", type=str, required=True)
-    return parser
+    return df
 
 
 if __name__ == "__main__":
-    parser = get_arg_parser()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cfg", type=str, required=True)
     args = parser.parse_args()
-
     plot_from_file(args.cfg)

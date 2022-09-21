@@ -1,14 +1,24 @@
 Utility script to launch jobs on Slurm (either via sbatch or srun), in a new tmux window, with PyTorch distributed, or in the current shell.
 
-## Examples
+
+Examples:
 * Launch job in current window using `~/configs/proj.yaml` config: `python -m rl_utils.launcher --cfg ~/configs/proj.yaml python imitation_learning/run.py`
-* Launch job on `user-overcap` partition: `python -m rl_utils.launcher --st user-overcap --cfg ~/configs/proj.yaml python imitation_learning/run.py`
+* Launch job on `user-overcap` partition: `python -m rl_utils.launcher --partition user-overcap --cfg ~/configs/proj.yaml python imitation_learning/run.py`
 
-## Run Exp Launcher
+Arguments
+* `--pt-proc`: Run with `torchrun` using `--pt-proc` per node.
+* `--cd`: Sets the `CUDA_VISIBLE_DEVICES`.
 
+Slurm arguments:
+* `--g`: Number of SLURM GPUs.
+* `--c`: Number of SLURM CPUs.
+* `--comment`: Comment to leave on SLURM run.
+
+## Run Exp Config Schema
 Keys in config file.
 * `add_all: str`: Suffix that is added to every command.
 * `slurm_ignore_nodes: List[str]`: List of Slurm hosts that should be ignored.
+* `proj_dat_add_env_vars: Dict[str, str]`: Mapping `--proj-dat` key to environment variables to export. Multiple environment variables are separated by spaces.
 
 Variables that are automatically substituted into the commands:
 * `$GROUP_ID`: A unique generated ID assigned to all runs from the command.
@@ -18,7 +28,7 @@ Variables that are automatically substituted into the commands:
 * `$PROJECT_NAME`: `proj_name` from config.
 * `$WB_ENTITY`: `wb_entity` from config.
 
-## Config Schema
+Example:
 ```
 base_data_dir: ""
 proj_name: ""
@@ -36,3 +46,8 @@ slurm:
     partition: 'partition_name'
     constraint: 'a40'
 ```
+
+
+
+## WB
+Dynamically substitute values into your commands by surrounding

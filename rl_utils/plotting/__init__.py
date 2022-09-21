@@ -1,7 +1,7 @@
-from rl_utils.plotting.auto_line import line_plot
-from rl_utils.plotting.auto_table import plot_table
-from rl_utils.plotting.utils import combine_dicts_to_df, fig_save
-from rl_utils.plotting.wb_query import batch_query, query, query_s
+from .auto_line import line_plot, plot_legend
+from .auto_table import plot_table
+from .utils import combine_dicts_to_df, fig_save
+from .wb_query import batch_query, query, query_s
 
 __all__ = [
     "plot_table",
@@ -9,6 +9,7 @@ __all__ = [
     "query_s",
     "batch_query",
     "line_plot",
+    "plot_legend",
     "fig_save",
     "combine_dicts_to_df",
 ]

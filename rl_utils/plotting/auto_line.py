@@ -87,7 +87,7 @@ def line_plot(
     group_colors: Optional[Dict[str, int]] = None,
     xtick_fn=None,
     ytick_fn=None,
-    legend=False,
+    legend: bool = False,
     rename_map: Optional[Dict[str, str]] = None,
     title=None,
     axes_font_size=14,
@@ -109,8 +109,12 @@ def line_plot(
     :param y_disp_bounds: What the plotting is stopped at.
     :param ax: If not specified, one is automatically created, with the specified dimensions under `ax_dims`
     :param group_colors: If not specified defaults to `method_idxs`.
-    :param num_marker_points: Key maps method name to the number of markers drawn on the line, NOT the
-      number of points that are plotted! By default this is 8.
+    :param num_marker_points: Key maps method name to the number of markers
+        drawn on the line, NOT the number of points that are plotted! By
+        default this is 8.
+    :param legend: Whether to include a legend within the plot.
+
+    :returns: The plotted figure.
     """
     fig = None
     if ax is None:
