@@ -100,7 +100,7 @@ def query(
         elif f == "id":
             search_id = v
         else:
-            raise ValueError(f"Filter {f}: {v} not supported")
+            query_dict["config." + f] = v
 
     def log(s):
         if verbose:
@@ -121,7 +121,14 @@ def query(
         dat = {"rank": rank_i}
         for f in select_fields:
             if f == "last_model":
-                model_path = osp.join(run.config["logger"]["save_dir"], run.name)
+
+                parts = proj_cfg["ckpt_cfg_key"].split(".")
+                model_path = run.config
+                for k in parts:
+                    model_path = model_path[k]
+                if proj_cfg.get("ckpt_append_name", False):
+                    model_path = osp.join(model_path, run.name)
+
                 if not osp.exists(model_path):
                     raise ValueError(f"Could not locate model folder {model_path}")
                 model_idxs = [
@@ -150,7 +157,10 @@ def query(
                 v = run.id
             elif f.startswith("config."):
                 config_parts = f.split("config.")
-                v = run.config[config_parts[1]]
+                parts = config_parts[1].split(".")
+                v = run.config
+                for k in parts:
+                    v = v[k]
             else:
                 if f.startswith("ALL_"):
                     fetch_field = extract_query_key(f)

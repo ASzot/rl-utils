@@ -29,28 +29,30 @@ def plot_table(
     :param col_key: A string from the set of columns.
     :param row_key: A string from the set of columns (but this is used to form the rows of the table).
     :param renames: Only used for display name conversions. Does not affect functionality.
-        Example: the data fame might look like
-        ```
-           democount        type  final_train_success
-        0     100  mirl train               0.9800
-        1     100  mirl train               0.9900
-        3     100   mirl eval               1.0000
-        4     100   mirl eval               1.0000
-        12     50  mirl train               0.9700
-        13     50  mirl train               1.0000
-        15     50   mirl eval               1.0000
-        16     50   mirl eval               0.7200
-        ```
-        `col_key='type', row_key='demcount',
-        cell_key='final_train_success'` plots the # of demos as rows and
-        the type as columns with the final_train_success values as the cell
-        values. Duplicate row and columns are automatically grouped
-        together.
     :param make_col_header: Returns the string at the top of the table like
         "ccccc". Put "c|ccccc" to insert a vertical line in between the first
         and other columns.
     :param x_label: Renders another row of text on the top that spans all the columns.
-    ;param y_label: Renders a side column with vertically rotated text that spawns all the rows.
+    :param y_label: Renders a side column with vertically rotated text that spawns all the rows.
+
+    Example: the data fame might look like
+    ```
+       democount        type  final_train_success
+    0     100  mirl train               0.9800
+    1     100  mirl train               0.9900
+    3     100   mirl eval               1.0000
+    4     100   mirl eval               1.0000
+    12     50  mirl train               0.9700
+    13     50  mirl train               1.0000
+    15     50   mirl eval               1.0000
+    16     50   mirl eval               0.7200
+    ```
+    `col_key='type', row_key='demcount',
+    cell_key='final_train_success'` plots the # of demos as rows and
+    the type as columns with the final_train_success values as the cell
+    values. Duplicate row and columns are automatically grouped
+    together.
+
     """
     if make_col_header is None:
 
