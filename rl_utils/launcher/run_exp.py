@@ -355,21 +355,10 @@ def execute_command_file(run_cmd, args, proj_cfg):
     cmds = [cmd.replace("$WB_ENTITY", proj_cfg.wb_entity) for cmd in cmds]
 
     if args.pt_proc != -1:
-        pt_dist_str = f"torchrun --nproc_per_node {args.pt_proc} "
+        pt_dist_str = f"torchrun --nproc_per_node {args.pt_proc}"
 
         def make_dist_cmd(x):
-            parts = x.split(" ")
-            runf = None
-            for i, part in enumerate(parts):
-                if ".py" in part:
-                    runf = i
-                    break
-
-            if runf is None:
-                raise ValueError("Could not split command")
-
-            rest = " ".join(parts[runf:])
-            return pt_dist_str + rest
+            return x.replace("python", pt_dist_str)
 
         cmds[0] = make_dist_cmd(cmds[0])
 
