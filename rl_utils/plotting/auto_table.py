@@ -1,8 +1,11 @@
+import argparse
 from typing import Callable, Dict, List, Optional
 
 import pandas as pd
+from omegaconf import OmegaConf
 
 from rl_utils.plotting.utils import MISSING_VALUE
+from rl_utils.plotting.wb_query import fetch_data_from_cfg
 
 
 def plot_table(
@@ -183,3 +186,18 @@ def plot_table(
         print(ret_s)
 
     return ret_s
+
+
+def plot_from_file(plot_cfg_path, add_query_fields=None):
+    cfg = OmegaConf.load(plot_cfg_path)
+    df = fetch_data_from_cfg(plot_cfg_path, add_query_fields)
+
+    plot_table(df, cell_key=cfg.plot_key, **cfg.sub_plot_params)
+    return df
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cfg", type=str, required=True)
+    args = parser.parse_args()
+    plot_from_file(args.cfg)

@@ -10,6 +10,7 @@ from pprint import pprint
 from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
+import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
 from rl_utils.common.core_utils import CacheHelper
@@ -218,6 +219,28 @@ def query_s(
         limit=limit,
         use_cached=use_cached,
     )
+
+
+def fetch_data_from_cfg(plot_cfg_path, add_query_fields=None):
+    cfg = OmegaConf.load(plot_cfg_path)
+    if add_query_fields is None:
+        add_query_fields = []
+
+    query_k = cfg.plot_key
+
+    result = batch_query(
+        [
+            [query_k, *add_query_fields, *cfg.get("add_query_keys", [])]
+            for _ in cfg.methods
+        ],
+        [{cfg.method_spec: v} for v in cfg.methods.values()],
+        all_should_skip=[len(v) == 0 for v in cfg.methods.values()],
+        all_add_info=[{"method": k} for k in cfg.methods.keys()],
+        proj_cfg=OmegaConf.load(cfg.proj_cfg),
+        use_cached=cfg.use_cached,
+        verbose=False,
+    )
+    return pd.DataFrame(result)
 
 
 if __name__ == "__main__":
