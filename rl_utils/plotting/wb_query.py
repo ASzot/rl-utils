@@ -33,6 +33,7 @@ def batch_query(
     limit=None,
     use_cached=False,
     reduce_op: Optional[Callable[[List], float]] = None,
+    error_ok: bool = False,
 ):
     data = []
     for select_fields, filter_fields, should_skip, add_info in zip(
@@ -48,6 +49,7 @@ def batch_query(
                 limit,
                 use_cached,
                 reduce_op,
+                error_ok=error_ok,
             )
         if len(r) == 0:
             r = [{k: MISSING_VALUE for k in select_fields}]
@@ -64,6 +66,7 @@ def query(
     limit=None,
     use_cached=False,
     reduce_op: Optional[Callable[[List], float]] = None,
+    error_ok: bool = False,
 ):
     """
     :param select_fields: The list of data to retrieve. If a field starts with
@@ -121,6 +124,7 @@ def query(
     for rank_i, run in enumerate(runs):
         dat = {"rank": rank_i}
         for f in select_fields:
+            v = None
             if f == "last_model":
 
                 parts = proj_cfg["ckpt_cfg_key"].split(".")
@@ -172,9 +176,17 @@ def query(
                         )
                     v = df[["_step", fetch_field]]
                 else:
+                    if f not in run.summary:
+                        if error_ok:
+                            continue
+                        raise ValueError(
+                            f"Could not find {f} in {run.summary.keys()} from run {run} with query {query_dict}"
+                        )
                     v = run.summary[f]
-            dat[f] = v
-        ret_data.append(dat)
+            if v is not None:
+                dat[f] = v
+        if len(dat) > 0:
+            ret_data.append(dat)
         if limit is not None and len(ret_data) >= limit:
             break
 
@@ -221,7 +233,7 @@ def query_s(
     )
 
 
-def fetch_data_from_cfg(plot_cfg_path, add_query_fields=None):
+def fetch_data_from_cfg(plot_cfg_path, add_query_fields=None, error_ok=False):
     cfg = OmegaConf.load(plot_cfg_path)
     if add_query_fields is None:
         add_query_fields = []
@@ -239,6 +251,7 @@ def fetch_data_from_cfg(plot_cfg_path, add_query_fields=None):
         proj_cfg=OmegaConf.load(cfg.proj_cfg),
         use_cached=cfg.use_cached,
         verbose=False,
+        error_ok=error_ok,
     )
     return pd.DataFrame(result)
 

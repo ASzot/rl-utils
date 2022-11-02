@@ -25,7 +25,12 @@ def plot_table(
     x_label: str = "",
     y_label: str = "",
     skip_toprule: bool = False,
+    include_err: bool = True,
     write_to=None,
+    err_key: Optional[str] = None,
+    add_tabular: bool = True,
+    bold_row_names: bool = True,
+    compute_err_fn: Optional[Callable[[pd.Series], pd.Series]] = None,
 ):
     """
     :param df: The index of the data frame does not matter, only the row values and column names matter.
@@ -37,6 +42,7 @@ def plot_table(
         and other columns.
     :param x_label: Renders another row of text on the top that spans all the columns.
     :param y_label: Renders a side column with vertically rotated text that spawns all the rows.
+    :param err_key: If non-None, this will be used as the error and override any error calculation.
 
     Example: the data fame might look like
     ```
@@ -69,8 +75,15 @@ def plot_table(
 
     rows = {}
     for row_k, row_df in df.groupby(row_key):
-        df_avg_y = row_df.groupby(col_key)[cell_key].mean()
-        df_std_y = row_df.groupby(col_key)[cell_key].std() * error_scaling
+        grouped = row_df.groupby(col_key)
+        df_avg_y = grouped[cell_key].mean()
+        df_std_y = grouped[cell_key].std() * error_scaling
+        if compute_err_fn is not None:
+            df_std_y = compute_err_fn(grouped[cell_key])
+        if err_key is not None:
+            err = grouped[err_key].mean()
+            if not err.hasnans:
+                df_std_y = err
 
         rows[row_k] = (df_avg_y, df_std_y)
 
@@ -93,7 +106,12 @@ def plot_table(
             all_s.append("\\hline")
             continue
         row_str = []
-        row_str.append("\\textbf{%s}" % clean_text(renames.get(row_k, row_k)))
+
+        if bold_row_names:
+            row_str.append("\\textbf{%s}" % clean_text(renames.get(row_k, row_k)))
+        else:
+            row_str.append(clean_text(renames.get(row_k, row_k)))
+
         row_y, row_std = rows[row_k]
 
         if get_row_highlight is not None:
@@ -112,20 +130,14 @@ def plot_table(
                 elif val == error_fill_value:
                     row_str.append("E")
                 else:
+                    err = ""
+                    if include_err:
+                        err = f"$ \\pm$ %.{n_decimals}f " % std
+                    txt = f" %.{n_decimals}f {{\\scriptsize}}{err} " % val
+
                     if col_k == sel_col:
-                        row_str.append(
-                            "\\textbf{ "
-                            + (
-                                f"%.{n_decimals}f {{\\scriptsize $\\pm$ %.{n_decimals}f }}"
-                                % (val, std)
-                            )
-                            + " }"
-                        )
-                    else:
-                        row_str.append(
-                            f" %.{n_decimals}f {{\\scriptsize $\\pm$ %.{n_decimals}f }} "
-                            % (val, std)
-                        )
+                        txt = "\\textbf{ " + txt + " }"
+                    row_str.append(txt)
 
         all_s.append(col_sep.join(row_str))
 
@@ -156,27 +168,30 @@ def plot_table(
         toprule += ("& \\multicolumn{%i}{c}{%s}" % (n_columns, x_label)) + row_sep
 
     ret_s = ""
-    ret_s += "\\begin{tabular}{%s}\n" % col_header_s
-    # Line above the table.
-    ret_s += toprule
+    if add_tabular:
+        ret_s += "\\begin{tabular}{%s}\n" % col_header_s
+        # Line above the table.
+        ret_s += toprule
 
-    # Separate the column headers from the rest of the table by a line.
-    ret_s += start_of_line + all_s[0] + row_sep
-    ret_s += midrule
+        # Separate the column headers from the rest of the table by a line.
+        ret_s += start_of_line + all_s[0] + row_sep
+        ret_s += midrule
 
     all_row_s = ""
-    for row_line in row_lines:
+    for i, row_line in enumerate(row_lines):
         all_row_s += row_line
-        if "hline" not in row_line:
+        # Do not add the separator to the last element if we are not in tabular mode.
+        if "hline" not in row_line and (i != len(row_lines) - 1 and not add_tabular):
             all_row_s += row_sep
         else:
             all_row_s += "\n"
 
     ret_s += all_row_s
     # Line below the table.
-    ret_s += botrule
+    if add_tabular:
+        ret_s += botrule
 
-    ret_s += "\n\\end{tabular}\n"
+        ret_s += "\n\\end{tabular}\n"
 
     if write_to is not None:
         with open(write_to, "w") as f:
