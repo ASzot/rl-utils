@@ -1,8 +1,11 @@
+import argparse
 from typing import Callable, Dict, List, Optional
 
 import pandas as pd
+from omegaconf import OmegaConf
 
 from rl_utils.plotting.utils import MISSING_VALUE
+from rl_utils.plotting.wb_query import fetch_data_from_cfg
 
 
 def plot_table(
@@ -22,7 +25,13 @@ def plot_table(
     x_label: str = "",
     y_label: str = "",
     skip_toprule: bool = False,
+    include_err: bool = True,
     write_to=None,
+    err_key: Optional[str] = None,
+    add_tabular: bool = True,
+    bold_row_names: bool = True,
+    show_row_labels: bool = True,
+    compute_err_fn: Optional[Callable[[pd.Series], pd.Series]] = None,
 ):
     """
     :param df: The index of the data frame does not matter, only the row values and column names matter.
@@ -34,6 +43,9 @@ def plot_table(
         and other columns.
     :param x_label: Renders another row of text on the top that spans all the columns.
     :param y_label: Renders a side column with vertically rotated text that spawns all the rows.
+    :param err_key: If non-None, this will be used as the error and override any error calculation.
+    :param show_row_labels: If False, the row names are not diplayed, and no
+        column for the row name is displayed.
 
     Example: the data fame might look like
     ```
@@ -66,8 +78,19 @@ def plot_table(
 
     rows = {}
     for row_k, row_df in df.groupby(row_key):
-        df_avg_y = row_df.groupby(col_key)[cell_key].mean()
-        df_std_y = row_df.groupby(col_key)[cell_key].std() * error_scaling
+        grouped = row_df.groupby(col_key)
+        df_avg_y = grouped[cell_key].mean()
+        df_std_y = grouped[cell_key].std() * error_scaling
+
+        sel_err = False
+        if err_key is not None:
+            err = grouped[err_key].mean()
+            if not err.hasnans:
+                df_std_y = err
+                sel_err = True
+
+        if not sel_err and compute_err_fn is not None:
+            df_std_y = compute_err_fn(grouped[cell_key])
 
         rows[row_k] = (df_avg_y, df_std_y)
 
@@ -80,7 +103,9 @@ def plot_table(
         return s.replace("%", "\\%").replace("_", " ")
 
     # Add the column title row.
-    row_str = [""]
+    row_str = []
+    if show_row_labels:
+        row_str.append("")
     for col_k in col_order:
         row_str.append("\\textbf{%s}" % clean_text(renames.get(col_k, col_k)))
     all_s.append(col_sep.join(row_str))
@@ -90,7 +115,13 @@ def plot_table(
             all_s.append("\\hline")
             continue
         row_str = []
-        row_str.append("\\textbf{%s}" % clean_text(renames.get(row_k, row_k)))
+
+        if show_row_labels:
+            if bold_row_names:
+                row_str.append("\\textbf{%s}" % clean_text(renames.get(row_k, row_k)))
+            else:
+                row_str.append(clean_text(renames.get(row_k, row_k)))
+
         row_y, row_std = rows[row_k]
 
         if get_row_highlight is not None:
@@ -109,24 +140,20 @@ def plot_table(
                 elif val == error_fill_value:
                     row_str.append("E")
                 else:
+                    err = ""
+                    if include_err:
+                        err = f"$ \\pm$ %.{n_decimals}f " % std
+                    txt = f" %.{n_decimals}f {{\\scriptsize}}{err} " % val
+
                     if col_k == sel_col:
-                        row_str.append(
-                            "\\textbf{ "
-                            + (
-                                f"%.{n_decimals}f {{\\scriptsize $\\pm$ %.{n_decimals}f }}"
-                                % (val, std)
-                            )
-                            + " }"
-                        )
-                    else:
-                        row_str.append(
-                            f" %.{n_decimals}f {{\\scriptsize $\\pm$ %.{n_decimals}f }} "
-                            % (val, std)
-                        )
+                        txt = "\\textbf{ " + txt + " }"
+                    row_str.append(txt)
 
         all_s.append(col_sep.join(row_str))
 
-    n_columns = len(col_order) + 1
+    n_columns = len(col_order)
+    if show_row_labels:
+        n_columns += 1
     col_header_s = make_col_header(n_columns)
     if y_label != "":
         col_header_s = "c" + col_header_s
@@ -153,17 +180,20 @@ def plot_table(
         toprule += ("& \\multicolumn{%i}{c}{%s}" % (n_columns, x_label)) + row_sep
 
     ret_s = ""
-    ret_s += "\\begin{tabular}{%s}\n" % col_header_s
-    # Line above the table.
-    ret_s += toprule
+    if add_tabular:
+        ret_s += "\\begin{tabular}{%s}\n" % col_header_s
+        # Line above the table.
+        ret_s += toprule
 
-    # Separate the column headers from the rest of the table by a line.
-    ret_s += start_of_line + all_s[0] + row_sep
-    ret_s += midrule
+        # Separate the column headers from the rest of the table by a line.
+        ret_s += start_of_line + all_s[0] + row_sep
+        ret_s += midrule
 
     all_row_s = ""
     for row_line in row_lines:
         all_row_s += row_line
+
+        # Do not add the separator to the last element if we are not in tabular mode.
         if "hline" not in row_line:
             all_row_s += row_sep
         else:
@@ -171,9 +201,10 @@ def plot_table(
 
     ret_s += all_row_s
     # Line below the table.
-    ret_s += botrule
+    if add_tabular:
+        ret_s += botrule
 
-    ret_s += "\n\\end{tabular}\n"
+        ret_s += "\n\\end{tabular}\n"
 
     if write_to is not None:
         with open(write_to, "w") as f:
@@ -183,3 +214,18 @@ def plot_table(
         print(ret_s)
 
     return ret_s
+
+
+def plot_from_file(plot_cfg_path, add_query_fields=None):
+    cfg = OmegaConf.load(plot_cfg_path)
+    df = fetch_data_from_cfg(plot_cfg_path, add_query_fields)
+
+    plot_table(df, cell_key=cfg.plot_key, **cfg.sub_plot_params)
+    return df
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cfg", type=str, required=True)
+    args = parser.parse_args()
+    plot_from_file(args.cfg)

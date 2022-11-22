@@ -5,15 +5,14 @@ import setuptools
 cur_dir = osp.dirname(osp.realpath(__file__))
 requirementPath = osp.join(cur_dir, "requirements.txt")
 install_requires = []
-if osp.isfile(requirementPath):
-    with open(requirementPath) as f:
-        install_requires = f.read().splitlines()
+with open(requirementPath) as f:
+    install_requires = f.read().splitlines()
 
 setuptools.setup(
-    name="rl-utils",
-    version="0.1",
+    name="rl-exp-utils",
+    version="0.12",
     author="Andrew Szot",
-    author_email="me@andrewszot.com",
+    author_email="andrewszot32@gmail.com",
     description="Library for RL research.",
     url="https://github.com/aszot/rl-utils",
     install_requires=install_requires,

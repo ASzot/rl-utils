@@ -15,8 +15,6 @@ from omegaconf import OmegaConf
 
 from rl_utils.plotting.wb_query import query_s
 
-RUNS_DIR = "data/log/runs"
-
 
 def get_arg_parser():
     parser = argparse.ArgumentParser()
@@ -33,6 +31,8 @@ def get_arg_parser():
         help="tmux session name to connect to",
     )
     parser.add_argument("--proj-dat", type=str, default=None)
+    parser.add_argument("--conda-env", type=str, default=None)
+    parser.add_argument("--runs-dir", type=str, default="data/log/runs")
     parser.add_argument(
         "--group-id",
         type=str,
@@ -62,7 +62,14 @@ def get_arg_parser():
             CUDA_VISIBLE_DEVICES at all.
             """,
     )
+
+    parser.add_argument(
+        "--skip-add-all",
+        action="store_true",
+    )
+
     parser.add_argument("--cfg", type=str, default=None)
+    parser.add_argument("--base-data-dir", type=str, default=None)
 
     # MULTIPROC OPTIONS
     parser.add_argument("--pt-proc", type=int, default=-1)
@@ -197,8 +204,14 @@ def get_random_id() -> str:
 
 def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg):
     conda_env = proj_cfg["conda_env"]
-    python_path = osp.join(osp.expanduser("~"), "miniconda3", "envs", conda_env, "bin")
-    python_path = proj_cfg.get("conda_path", python_path)
+
+    if args.conda_env is None:
+        python_path = osp.join(
+            osp.expanduser("~"), "miniconda3", "envs", conda_env, "bin"
+        )
+        python_path = proj_cfg.get("conda_path", python_path)
+    else:
+        python_path = args.conda_env
 
     g = as_list(args.g, num_cmds)
     c = as_list(args.c, num_cmds)
@@ -209,7 +222,7 @@ def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg):
     ident = get_random_id()
     if args.name_prefix is not None:
         ident = args.name_prefix + "_" + ident
-    log_file = osp.join(RUNS_DIR, ident) + ".log"
+    log_file = osp.join(args.runs_dir, ident) + ".log"
     cmd = cmd.replace("$SLURM_ID", ident)
 
     if args.partition is None:
@@ -314,8 +327,8 @@ def sub_in_args(old_cmd: str, new_args: str):
 
 
 def execute_command_file(run_cmd, args, proj_cfg):
-    if not osp.exists(RUNS_DIR):
-        os.makedirs(RUNS_DIR)
+    if not osp.exists(args.runs_dir):
+        os.makedirs(args.runs_dir)
 
     cmds = get_cmds(run_cmd)
 
@@ -328,7 +341,7 @@ def execute_command_file(run_cmd, args, proj_cfg):
     n_cmds = len(cmds)
 
     add_all = proj_cfg.get("add_all", None)
-    if add_all is not None:
+    if add_all is not None and not args.skip_add_all:
         cmds = [sub_in_args(cmd, add_all) for cmd in cmds]
 
     # Add on the project data
@@ -341,7 +354,9 @@ def execute_command_file(run_cmd, args, proj_cfg):
                 cmds = [env_var_dat + " " + cmd for cmd in cmds]
 
     # Sub in variables
-    if "base_data_dir" in proj_cfg:
+    if args.base_data_dir is not None:
+        cmds = [cmd.replace("$DATA_DIR", args.base_data_dir) for cmd in cmds]
+    elif "base_data_dir" in proj_cfg:
         cmds = [cmd.replace("$DATA_DIR", proj_cfg["base_data_dir"]) for cmd in cmds]
 
     if args.group_id is None:
@@ -386,7 +401,9 @@ def execute_command_file(run_cmd, args, proj_cfg):
             log(f"Running {exec_cmd}", args)
             os.system(exec_cmd)
         else:
-            raise ValueError("Running multiple jobs. You must specify tmux session id")
+            raise ValueError(
+                f"Running multiple jobs. You must specify tmux session id. Tried to run {cmds}"
+            )
     else:
 
         if args.run_single:
