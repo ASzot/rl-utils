@@ -14,9 +14,8 @@ A library of helper functions, environment helpers, and experiment management fu
 # Installation
 Requires Python >= 3.7.
 
-Install from source for development:
-* Clone this repository `git clone https://github.com/ASzot/rl-utils.git`
-* `pip install -e .`
+* `pip install rl-exp-utils`
+* To install from source: `git clone https://github.com/ASzot/rl-utils.git && cd rl-utils && git install -e .`
 
 # Environments
 Toy environments to test algorithms.

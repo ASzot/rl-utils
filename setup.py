@@ -10,9 +10,9 @@ with open(requirementPath) as f:
 
 setuptools.setup(
     name="rl-exp-utils",
-    version="0.11",
+    version="0.12",
     author="Andrew Szot",
-    author_email="andrewszot0@gmail.com",
+    author_email="andrewszot32@gmail.com",
     description="Library for RL research.",
     url="https://github.com/aszot/rl-utils",
     install_requires=install_requires,
