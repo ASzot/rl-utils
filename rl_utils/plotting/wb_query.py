@@ -26,15 +26,24 @@ def extract_query_key(k):
 def batch_query(
     all_select_fields: List[List[str]],
     all_filter_fields: List[Dict[str, Any]],
-    all_should_skip: List[bool],
-    all_add_info: List[Dict[str, Any]],
     proj_cfg: Dict[str, Any],
+    all_should_skip: Optional[List[bool]] = None,
+    all_add_info: Optional[List[Dict[str, Any]]] = None,
     verbose=True,
     limit=None,
     use_cached=False,
     reduce_op: Optional[Callable[[List], float]] = None,
     error_ok: bool = False,
 ):
+    """
+    - all_should_skip: Whether to skip querying this value.
+    """
+    n_query = len(all_select_fields)
+    if all_add_info is None:
+        all_add_info = [None for _ in range(n_query)]
+    if all_should_skip is None:
+        all_should_skip = [False for _ in range(n_query)]
+
     data = []
     for select_fields, filter_fields, should_skip, add_info in zip(
         all_select_fields, all_filter_fields, all_should_skip, all_add_info
@@ -54,7 +63,10 @@ def batch_query(
         if len(r) == 0:
             r = [{k: MISSING_VALUE for k in select_fields}]
         for d in r:
-            data.append({**add_info, **d})
+            if add_info is None:
+                data.append(d)
+            else:
+                data.append({**add_info, **d})
     return data
 
 
@@ -71,7 +83,8 @@ def query(
     """
     :param select_fields: The list of data to retrieve. If a field starts with
         "ALL_", then all the entries for this name from W&B are fetched. This gets
-        the ENTIRE history.
+        the ENTIRE history. Other special keys include: "_runtime" (in
+        seconds), "_timestamp".
     :param filter_fields: Key is the filter type (like group or tag) and value
         is the filter value (like the name of the group or tag to match)
     :param reduce_op: `np.mean` would take the average of the results.
@@ -233,7 +246,15 @@ def query_s(
     )
 
 
-def fetch_data_from_cfg(plot_cfg_path, add_query_fields=None, error_ok=False):
+def fetch_data_from_cfg(
+    plot_cfg_path: str,
+    add_query_fields: Optional[List[str]] = None,
+    error_ok: bool = False,
+) -> pd.DataFrame:
+    """
+    See the README for how the YAML file at `plot_cfg_path` should be structured.
+    """
+
     cfg = OmegaConf.load(plot_cfg_path)
     if add_query_fields is None:
         add_query_fields = []

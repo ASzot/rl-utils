@@ -31,6 +31,7 @@ def get_arg_parser():
         help="tmux session name to connect to",
     )
     parser.add_argument("--proj-dat", type=str, default=None)
+    parser.add_argument("--conda-env", type=str, default=None)
     parser.add_argument("--runs-dir", type=str, default="data/log/runs")
     parser.add_argument(
         "--group-id",
@@ -203,8 +204,14 @@ def get_random_id() -> str:
 
 def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg):
     conda_env = proj_cfg["conda_env"]
-    python_path = osp.join(osp.expanduser("~"), "miniconda3", "envs", conda_env, "bin")
-    python_path = proj_cfg.get("conda_path", python_path)
+
+    if args.conda_env is None:
+        python_path = osp.join(
+            osp.expanduser("~"), "miniconda3", "envs", conda_env, "bin"
+        )
+        python_path = proj_cfg.get("conda_path", python_path)
+    else:
+        python_path = args.conda_env
 
     g = as_list(args.g, num_cmds)
     c = as_list(args.c, num_cmds)

@@ -30,6 +30,7 @@ def plot_table(
     err_key: Optional[str] = None,
     add_tabular: bool = True,
     bold_row_names: bool = True,
+    show_row_labels: bool = True,
     compute_err_fn: Optional[Callable[[pd.Series], pd.Series]] = None,
 ):
     """
@@ -43,6 +44,8 @@ def plot_table(
     :param x_label: Renders another row of text on the top that spans all the columns.
     :param y_label: Renders a side column with vertically rotated text that spawns all the rows.
     :param err_key: If non-None, this will be used as the error and override any error calculation.
+    :param show_row_labels: If False, the row names are not diplayed, and no
+        column for the row name is displayed.
 
     Example: the data fame might look like
     ```
@@ -78,12 +81,16 @@ def plot_table(
         grouped = row_df.groupby(col_key)
         df_avg_y = grouped[cell_key].mean()
         df_std_y = grouped[cell_key].std() * error_scaling
-        if compute_err_fn is not None:
-            df_std_y = compute_err_fn(grouped[cell_key])
+
+        sel_err = False
         if err_key is not None:
             err = grouped[err_key].mean()
             if not err.hasnans:
                 df_std_y = err
+                sel_err = True
+
+        if not sel_err and compute_err_fn is not None:
+            df_std_y = compute_err_fn(grouped[cell_key])
 
         rows[row_k] = (df_avg_y, df_std_y)
 
@@ -96,7 +103,9 @@ def plot_table(
         return s.replace("%", "\\%").replace("_", " ")
 
     # Add the column title row.
-    row_str = [""]
+    row_str = []
+    if show_row_labels:
+        row_str.append("")
     for col_k in col_order:
         row_str.append("\\textbf{%s}" % clean_text(renames.get(col_k, col_k)))
     all_s.append(col_sep.join(row_str))
@@ -107,10 +116,11 @@ def plot_table(
             continue
         row_str = []
 
-        if bold_row_names:
-            row_str.append("\\textbf{%s}" % clean_text(renames.get(row_k, row_k)))
-        else:
-            row_str.append(clean_text(renames.get(row_k, row_k)))
+        if show_row_labels:
+            if bold_row_names:
+                row_str.append("\\textbf{%s}" % clean_text(renames.get(row_k, row_k)))
+            else:
+                row_str.append(clean_text(renames.get(row_k, row_k)))
 
         row_y, row_std = rows[row_k]
 
@@ -141,7 +151,9 @@ def plot_table(
 
         all_s.append(col_sep.join(row_str))
 
-    n_columns = len(col_order) + 1
+    n_columns = len(col_order)
+    if show_row_labels:
+        n_columns += 1
     col_header_s = make_col_header(n_columns)
     if y_label != "":
         col_header_s = "c" + col_header_s
@@ -178,10 +190,11 @@ def plot_table(
         ret_s += midrule
 
     all_row_s = ""
-    for i, row_line in enumerate(row_lines):
+    for row_line in row_lines:
         all_row_s += row_line
+
         # Do not add the separator to the last element if we are not in tabular mode.
-        if "hline" not in row_line and (i != len(row_lines) - 1 and not add_tabular):
+        if "hline" not in row_line:
             all_row_s += row_sep
         else:
             all_row_s += "\n"

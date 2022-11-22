@@ -1,4 +1,5 @@
 import argparse
+from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Union
 
 import matplotlib
@@ -28,33 +29,6 @@ def smooth_arr(scalars: List[float], weight: float) -> List[float]:
         last = smoothed_val  # Anchor the last smoothed value
 
     return smoothed
-
-
-def smooth_data(df, smooth_vals, value, gp_keys: Optional[List[str]] = None):
-    if gp_keys is None:
-        gp_keys = ["method", "run"]
-
-    gp_df = df.groupby(gp_keys)
-
-    ret_dfs = []
-    if not isinstance(smooth_vals, dict):
-        smooth_vals = {"default": float(smooth_vals)}
-    for sub_df in [gp_df.get_group(k) for k in gp_df.indices]:
-        df_method_name = sub_df["method"].iloc[0]
-        if isinstance(df_method_name, pd.Series):
-            df_method_name = df_method_name.tolist()[0]
-
-        if df_method_name in smooth_vals:
-            smooth = smooth_vals[sub_df["method"][0]]
-        else:
-            smooth = smooth_vals["default"]
-        use_df = sub_df.copy()
-        use_df = use_df.dropna()
-        use_df[value] = smooth_arr(use_df[value].tolist(), smooth)
-
-        ret_dfs.append(use_df)
-
-    return pd.concat(ret_dfs, ignore_index=True)
 
 
 def make_steps_match(plot_df, group_key, x_name):
@@ -99,6 +73,9 @@ def line_plot(
     tight=False,
     nlegend_cols=1,
     fetch_std=False,
+    y_logscale=False,
+    x_logscale=False,
+    legend_loc: Optional[str] = None,
     ax_dims: Tuple[int, int] = (5, 4),
 ):
     """
@@ -174,9 +151,15 @@ def line_plot(
             names.append(n.get_text())
             lines.append((all_lines[i * 2 + 1], all_lines[i * 2]))
 
+    if not isinstance(smooth_factor, dict):
+        smooth_factor_lookup = defaultdict(lambda: smooth_factor)
+    else:
+        smooth_factor_lookup = defaultdict(lambda: 0.0)
+        for k, v in smooth_factor.items():
+            smooth_factor_lookup[k] = v
+
     for name, sub_df in avg_y_df.groupby(level=0):
         names.append(name)
-        # sub_df = smooth_data(sub_df, smooth_factor, y_name, [group_key, avg_key])
         x_vals = sub_df.index.get_level_values(x_name).to_numpy()
         y_vals = sub_df[y_name].to_numpy()
 
@@ -192,14 +175,8 @@ def line_plot(
             use_y_vals[-1],
         )
         y_std = sub_df["std"].fillna(0).to_numpy()
-        if isinstance(smooth_factor, dict):
-            use_smooth_factor = (
-                smooth_factor[name]
-                if name in smooth_factor
-                else smooth_factor["default"]
-            )
-        else:
-            use_smooth_factor = smooth_factor
+
+        use_smooth_factor = smooth_factor_lookup[name]
         if use_smooth_factor != 0.0:
             y_vals = np.array(smooth_arr(y_vals, use_smooth_factor))
             y_std = np.array(smooth_arr(y_std, use_smooth_factor))
@@ -248,20 +225,28 @@ def line_plot(
     if legend:
         labs = [(i, line_to_add[0].get_label()) for i, line_to_add in enumerate(lines)]
         labs = sorted(labs, key=lambda x: method_idxs[names[x[0]]])
+        kwargs = {}
+        if legend_loc is not None:
+            kwargs["loc"] = legend_loc
         plt.legend(
             [lines[i] for i, _ in labs],
             [x[1] for x in labs],
             fontsize=legend_font_size,
             ncol=nlegend_cols,
+            **kwargs,
         )
 
     ax.grid(b=True, which="major", color="lightgray", linestyle="--")
 
     ax.set_xlabel(rename_map.get(x_name, x_name), fontsize=axes_font_size)
     ax.set_ylabel(rename_map.get(y_name, y_name), fontsize=axes_font_size)
+    if x_logscale:
+        ax.set_xscale("log")
+    if y_logscale:
+        ax.set_yscale("log")
     if title is not None and title != "":
         ax.set_title(title, fontsize=title_font_size)
-    return fig  # noqa: R504
+    return fig, ax
 
 
 def gen_fake_data(x_scale, data_key, n_runs=5):
