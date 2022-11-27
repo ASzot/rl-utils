@@ -326,6 +326,21 @@ def sub_in_args(old_cmd: str, new_args: str):
     return " ".join(old_parts)
 
 
+def sub_in_vars(cmd, proj_cfg, rank_i, group_id, override_base_data_dir=None):
+    return (
+        cmd.replace("$GROUP_ID", group_id)
+        .replace(
+            "$DATA_DIR",
+            proj_cfg["base_data_dir"]
+            if override_base_data_dir is None
+            else override_base_data_dir,
+        )
+        .replace("$CMD_RANK", str(rank_i))
+        .replace("$PROJECT_NAME", proj_cfg.proj_name)
+        .replace("$WB_ENTITY", proj_cfg.wb_entity)
+    )
+
+
 def execute_command_file(run_cmd, args, proj_cfg):
     if not osp.exists(args.runs_dir):
         os.makedirs(args.runs_dir)
@@ -353,21 +368,15 @@ def execute_command_file(run_cmd, args, proj_cfg):
             if env_var_dat is not None:
                 cmds = [env_var_dat + " " + cmd for cmd in cmds]
 
-    # Sub in variables
-    if args.base_data_dir is not None:
-        cmds = [cmd.replace("$DATA_DIR", args.base_data_dir) for cmd in cmds]
-    elif "base_data_dir" in proj_cfg:
-        cmds = [cmd.replace("$DATA_DIR", proj_cfg["base_data_dir"]) for cmd in cmds]
-
     if args.group_id is None:
         group_ident = get_random_id()
     else:
         group_ident = args.group_id
     print(f"Assigning group ID {group_ident}")
-    cmds = [cmd.replace("$GROUP_ID", group_ident) for cmd in cmds]
-    cmds = [cmd.replace("$CMD_RANK", str(rank_i)) for rank_i, cmd in enumerate(cmds)]
-    cmds = [cmd.replace("$PROJECT_NAME", proj_cfg.proj_name) for cmd in cmds]
-    cmds = [cmd.replace("$WB_ENTITY", proj_cfg.wb_entity) for cmd in cmds]
+    cmds = [
+        sub_in_vars(cmd, proj_cfg, rank_i, group_ident, args.base_data_dir)
+        for rank_i, cmd in enumerate(cmds)
+    ]
 
     if args.pt_proc != -1:
         pt_dist_str = f"torchrun --nproc_per_node {args.pt_proc}"
