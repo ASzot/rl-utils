@@ -33,6 +33,10 @@ def change_arg_vals(cmd_parts: List[str], new_arg_values: Dict[str, Any]) -> Lis
     return cmd_parts
 
 
+def split_cmd_txt(cmd):
+    return [y for x in cmd.split(" ") for y in x.split("=")]
+
+
 def eval_ckpt(
     run_id,
     model_ckpt_path,
@@ -47,11 +51,22 @@ def eval_ckpt(
     run_path = osp.join(RUN_DIR, run_id + ".sh")
     with open(run_path, "r") as f:
         cmd = f.readlines()[-1]
-    cmd_parts = cmd.split(" ")
+    cmd_parts = split_cmd_txt(cmd)
+
+    def add_eval_suffix(x):
+        x = x.strip()
+        if "." in x:
+            parts = x.split(".")
+            return parts[0] + "_eval." + parts[1]
+        elif x[-1] == "/":
+            return x[:-1] + "_eval/"
+        else:
+            return x + "_eval"
+
     cmd_parts = change_arg_vals(
         cmd_parts,
         {
-            "WB.RUN_NAME": lambda x: f"{x}_eval",
+            **{k: add_eval_suffix for k in eval_sys_cfg.add_eval_to_vals},
             **eval_sys_cfg.change_vals,
         },
     )
@@ -65,14 +80,27 @@ def eval_ckpt(
     add_env_vars = cfg.add_env_vars
     if proj_dat is not None:
         for k in proj_dat.split(","):
-            cmd_parts.append(cfg.proj_data[k])
+            cmd_parts.extend(split_cmd_txt(cfg.proj_data[k]))
             add_env_vars.append(cfg.get("proj_dat_add_env_vars", {}).get(k, ""))
     cmd_parts = cmd_parts[1:]
     cmd_parts = [*add_env_vars, *cmd_parts]
 
     if modify_run_cmd_fn is not None:
         cmd_parts = modify_run_cmd_fn(cmd_parts, new_run_id, args)
-    new_cmd = " ".join(cmd_parts)
+
+    python_file = -1
+    for i, cmd_part in enumerate(cmd_parts):
+        if ".py" in cmd_part:
+            python_file = i
+            break
+    new_cmd = (" ".join(cmd_parts[: python_file + 1])) + " "
+    for i in range(python_file + 1, len(cmd_parts) - 1, 2):
+        k, v = cmd_parts[i], cmd_parts[i + 1]
+        if k.startswith("--"):
+            sep = " "
+        else:
+            sep = eval_sys_cfg.sep
+        new_cmd += f" {k}{sep}{v}"
     new_cmd = sub_in_vars(new_cmd, cfg, 0, "eval")
 
     print("EVALUATING ", new_cmd)
