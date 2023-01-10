@@ -250,6 +250,7 @@ def fetch_data_from_cfg(
     plot_cfg_path: str,
     add_query_fields: Optional[List[str]] = None,
     error_ok: bool = False,
+    method_key: str = "methods",
 ) -> pd.DataFrame:
     """
     See the README for how the YAML file at `plot_cfg_path` should be structured.
@@ -260,15 +261,13 @@ def fetch_data_from_cfg(
         add_query_fields = []
 
     query_k = cfg.plot_key
+    methods = cfg[method_key]
 
     result = batch_query(
-        [
-            [query_k, *add_query_fields, *cfg.get("add_query_keys", [])]
-            for _ in cfg.methods
-        ],
-        [{cfg.method_spec: v} for v in cfg.methods.values()],
-        all_should_skip=[len(v) == 0 for v in cfg.methods.values()],
-        all_add_info=[{"method": k} for k in cfg.methods.keys()],
+        [[query_k, *add_query_fields, *cfg.get("add_query_keys", [])] for _ in methods],
+        [{cfg.method_spec: v} for v in methods.values()],
+        all_should_skip=[len(v) == 0 for v in methods.values()],
+        all_add_info=[{"method": k} for k in methods.keys()],
         proj_cfg=OmegaConf.load(cfg.proj_cfg),
         use_cached=cfg.use_cached,
         verbose=False,

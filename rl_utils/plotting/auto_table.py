@@ -31,7 +31,9 @@ def plot_table(
     add_tabular: bool = True,
     bold_row_names: bool = True,
     show_row_labels: bool = True,
+    show_col_labels: bool = True,
     compute_err_fn: Optional[Callable[[pd.Series], pd.Series]] = None,
+    value_scaling: float = 1.0,
 ):
     """
     :param df: The index of the data frame does not matter, only the row values and column names matter.
@@ -66,6 +68,7 @@ def plot_table(
     together.
 
     """
+    df[cell_key] = df[cell_key] * value_scaling
     if make_col_header is None:
 
         def make_col_header(n_cols):
@@ -132,10 +135,9 @@ def plot_table(
             if col_k not in row_y:
                 row_str.append("-")
             else:
-
                 val = row_y.loc[col_k]
                 std = row_std.loc[col_k]
-                if val == missing_fill_value:
+                if val == missing_fill_value * value_scaling:
                     row_str.append("-")
                 elif val == error_fill_value:
                     row_str.append("E")
@@ -185,6 +187,7 @@ def plot_table(
         # Line above the table.
         ret_s += toprule
 
+    if show_col_labels:
         # Separate the column headers from the rest of the table by a line.
         ret_s += start_of_line + all_s[0] + row_sep
         ret_s += midrule

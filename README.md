@@ -49,6 +49,7 @@ Keys in config file.
 * `ckpt_append_name`: If True, the run name is appended to the checkpoint folder.
 * `slurm_ignore_nodes: List[str]`: List of Slurm hosts that should be ignored.
 * `proj_dat_add_env_vars: Dict[str, str]`: Mapping `--proj-dat` key to environment variables to export. Multiple environment variables are separated by spaces.
+* `eval_sys`: Configuration for the evaluation system. More information on this below.
 
 Variables that are automatically substituted into the commands:
 * `$GROUP_ID`: A unique generated ID assigned to all runs from the command.
@@ -59,7 +60,7 @@ Variables that are automatically substituted into the commands:
 * `$WB_ENTITY`: `wb_entity` from config.
 
 Example:
-```
+```yaml
 base_data_dir: ""
 proj_name: ""
 wb_entity: ""
@@ -70,6 +71,11 @@ add_env_vars:
 conda_env: "conda_env_name"
 slurm_ignore_nodes: ["node_name"]
 add_all: "ARG arg_value"
+eval_sys:
+  ckpt_load_k: "the argument name to pass the evaluation checkpoint directory to"
+  ckpt_search_dir: "folder name relative to base data dir where checkpoints are saved."
+  change_vals:
+    "arg name": "new arg value"
 proj_data:
   option: "ARG arg_value"
 slurm:
@@ -79,11 +85,14 @@ slurm:
     constraint: 'a40'
 ```
 
+# Auto Evaluation System
+Automatically evaluate experiments from the train job slurm launch script. Example usage: `python -m rl_utils.launcher.eval_sys --runs th_im_single_Ja921cfd5 --proj-dat render`. The `eval_sys` config key in the project config specifies how to change the launch command for evaluation (like loading a checkpoint or changing to an evaluation mode).
+
 # Plotting
 
 ## Auto Line
 Run something like `python -m rl_utils.plotting.auto_line --cfg plot_cfgs/my_plot.yaml` where `plot_cfgs/my_plot.yaml` looks something like:
-```
+```yaml
 methods:
   "dense_reward": "Ud05e1467"
   "sparse": "W5c609da1"
