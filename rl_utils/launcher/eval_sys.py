@@ -6,12 +6,14 @@ from typing import Any, Callable, Dict, List, Optional
 
 from omegaconf import OmegaConf
 
-from rl_utils.launcher.run_exp import sub_in_vars
+from rl_utils.launcher.run_exp import sub_in_vars, get_random_id
 
 RUN_DIR = "data/log/runs/"
 
 
-def change_arg_vals(cmd_parts: List[str], new_arg_values: Dict[str, Any]) -> List[str]:
+def change_arg_vals(
+    cmd_parts: List[str], new_arg_values: Dict[str, Any]
+) -> List[str]:
     """
     If the argument value does not exist, it will be added.
     :param new_arg_values: If the value is a function, it will take as input
@@ -28,7 +30,11 @@ def change_arg_vals(cmd_parts: List[str], new_arg_values: Dict[str, Any]) -> Lis
             did_find[cmd_parts[i]] = True
     all_not_found_k = [k for k, did_find in did_find.items() if not did_find]
     for not_found_k in all_not_found_k:
-        cmd_parts.extend([not_found_k, new_arg_values[not_found_k]])
+        new_val = new_arg_values[not_found_k]
+        if isinstance(new_val, Callable):
+            new_val = new_val("")
+
+        cmd_parts.extend([not_found_k, new_val])
 
     return cmd_parts
 
@@ -49,13 +55,22 @@ def eval_ckpt(
     eval_sys_cfg = cfg.eval_sys
     # Find the run command.
     run_path = osp.join(RUN_DIR, run_id + ".sh")
-    with open(run_path, "r") as f:
-        cmd = f.readlines()[-1]
-    cmd_parts = split_cmd_txt(cmd)
+    if osp.exists(run_path):
+        # Get the actually executed command.
+        with open(run_path, "r") as f:
+            cmd = f.readlines()[-1]
+        cmd_parts = split_cmd_txt(cmd)
+    else:
+        cmd = eval_sys_cfg.eval_run_cmd
+        cmd_parts = split_cmd_txt(cmd)
+        # Dummy line for srun
+        cmd_parts.insert(0, "")
 
     def add_eval_suffix(x):
         x = x.strip()
-        if "." in x:
+        if x == "":
+            return get_random_id() + "_eval"
+        elif "." in x:
             parts = x.split(".")
             return parts[0] + "_eval." + parts[1]
         elif x[-1] == "/":
@@ -81,7 +96,9 @@ def eval_ckpt(
     if proj_dat is not None:
         for k in proj_dat.split(","):
             cmd_parts.extend(split_cmd_txt(cfg.proj_data[k]))
-            add_env_vars.append(cfg.get("proj_dat_add_env_vars", {}).get(k, ""))
+            add_env_vars.append(
+                cfg.get("proj_dat_add_env_vars", {}).get(k, "")
+            )
     cmd_parts = cmd_parts[1:]
     cmd_parts = [*add_env_vars, *cmd_parts]
 
@@ -128,7 +145,9 @@ def run(
     eval_sys_cfg = cfg.eval_sys
     runs = args.runs.split(",")
     for run_id in runs:
-        full_path = osp.join(cfg.base_data_dir, eval_sys_cfg.ckpt_search_dir, run_id)
+        full_path = osp.join(
+            cfg.base_data_dir, eval_sys_cfg.ckpt_search_dir, run_id
+        )
         ckpt_idxs = [
             int(f.split(".")[1])
             for f in os.listdir(full_path)
