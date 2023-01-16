@@ -75,7 +75,9 @@ def eval_ckpt(
 
     def add_eval_suffix(x):
         x = x.strip()
-        if "." in x:
+        if x == "":
+            return get_random_id() + "_eval"
+        elif "." in x:
             parts = x.split(".")
             return parts[0] + "_eval." + parts[1]
         elif x[-1] == "/":
