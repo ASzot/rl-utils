@@ -119,7 +119,7 @@ Argument description:
 
 ## Auto Bar
 Config Schema:
-```
+```yaml
 methods:
   st_pop: K94569d43
   im_pop: Rb2cd0028

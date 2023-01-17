@@ -20,7 +20,9 @@ def plot_table(
     n_decimals=2,
     missing_fill_value=MISSING_VALUE,
     error_fill_value=0.3444,
-    get_row_highlight: Optional[Callable[[str, pd.DataFrame], Optional[str]]] = None,
+    get_row_highlight: Optional[
+        Callable[[str, pd.DataFrame], Optional[str]]
+    ] = None,
     make_col_header: Optional[Callable[[int], str]] = None,
     x_label: str = "",
     y_label: str = "",
@@ -61,11 +63,10 @@ def plot_table(
     15     50   mirl eval               1.0000
     16     50   mirl eval               0.7200
     ```
-    `col_key='type', row_key='demcount',
-    cell_key='final_train_success'` plots the # of demos as rows and
-    the type as columns with the final_train_success values as the cell
-    values. Duplicate row and columns are automatically grouped
-    together.
+    `col_key='type', row_key='demcount', cell_key='final_train_success'` plots
+    the # of demos as rows and the type as columns with the final_train_success
+    values as the cell values. Duplicate row and columns are automatically
+    grouped together.
 
     """
     df[cell_key] = df[cell_key] * value_scaling
@@ -121,7 +122,9 @@ def plot_table(
 
         if show_row_labels:
             if bold_row_names:
-                row_str.append("\\textbf{%s}" % clean_text(renames.get(row_k, row_k)))
+                row_str.append(
+                    "\\textbf{%s}" % clean_text(renames.get(row_k, row_k))
+                )
             else:
                 row_str.append(clean_text(renames.get(row_k, row_k)))
 
@@ -145,7 +148,8 @@ def plot_table(
                     err = ""
                     if include_err:
                         err = f"$ \\pm$ %.{n_decimals}f " % std
-                    txt = f" %.{n_decimals}f {{\\scriptsize}}{err} " % val
+                        err = f"{{\\scriptsize {err} }}"
+                    txt = f" %.{n_decimals}f {err}" % val
 
                     if col_k == sel_col:
                         txt = "\\textbf{ " + txt + " }"
@@ -179,7 +183,9 @@ def plot_table(
         toprule = ""
 
     if x_label != "":
-        toprule += ("& \\multicolumn{%i}{c}{%s}" % (n_columns, x_label)) + row_sep
+        toprule += (
+            "& \\multicolumn{%i}{c}{%s}" % (n_columns, x_label)
+        ) + row_sep
 
     ret_s = ""
     if add_tabular:
