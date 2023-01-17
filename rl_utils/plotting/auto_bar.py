@@ -38,6 +38,7 @@ def plot_bar(
     group_colors: Optional[Dict[str, Tuple[float, float, float]]] = None,
     legend: bool = False,
     xlabel: Optional[str] = None,
+    xlabel_rot: int = 30,
 ):
     """
     :param group_key: The key to take the average/std over. Likely the method key.
@@ -48,6 +49,7 @@ def plot_bar(
     :param base_bar_width: Bar width. Scaled by the # of bars per group.
     :param group_colors: Maps the bar group key to a color (RGB float tuple
         [0,1]). Overrides `name_colors`.
+    :param xlabel_rot: The rotation (in degrees) of the labels on the x-axis.
     """
 
     def_idx = [(k, i) for i, k in enumerate(plot_df[group_key].unique())]
@@ -134,7 +136,9 @@ def plot_bar(
 
     xtic_locs = use_x
     ax.set_xticks(xtic_locs)
-    ax.set_xticklabels(xtic_names, rotation=30, fontsize=axis_font_size)
+    ax.set_xticklabels(
+        xtic_names, rotation=xlabel_rot, fontsize=axis_font_size
+    )
     ax.set_ylabel(rename_map.get(plot_key, plot_key), fontsize=axis_font_size)
     if xlabel is not None:
         ax.set_xlabel(xlabel, fontsize=axis_font_size)
