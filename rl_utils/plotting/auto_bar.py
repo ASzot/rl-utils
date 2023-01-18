@@ -22,6 +22,7 @@ def plot_bar(
     name_colors=None,
     rename_map: Optional[Dict[str, str]] = None,
     show_ticks: bool = True,
+    tic_font_size: int = 14,
     axis_font_size: int = 14,
     legend_font_size: int = 14,
     y_disp_bounds: Tuple[float, float] = None,
@@ -136,9 +137,7 @@ def plot_bar(
 
     xtic_locs = use_x
     ax.set_xticks(xtic_locs)
-    ax.set_xticklabels(
-        xtic_names, rotation=xlabel_rot, fontsize=axis_font_size
-    )
+    ax.set_xticklabels(xtic_names, rotation=xlabel_rot, fontsize=tic_font_size)
     ax.set_ylabel(rename_map.get(plot_key, plot_key), fontsize=axis_font_size)
     if xlabel is not None:
         ax.set_xlabel(xlabel, fontsize=axis_font_size)
@@ -149,7 +148,7 @@ def plot_bar(
     if legend:
         ax.legend(fontsize=legend_font_size)
     for lab in ax.get_yticklabels():
-        lab.set_fontsize(axis_font_size)
+        lab.set_fontsize(tic_font_size)
     return fig
 
 

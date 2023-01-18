@@ -32,6 +32,12 @@ def get_arg_parser():
     )
     parser.add_argument("--proj-dat", type=str, default=None)
     parser.add_argument("--conda-env", type=str, default=None)
+    parser.add_argument(
+        "--time-freq",
+        type=int,
+        default=None,
+        help="Sampling frequency for pyspy. If set, this will enable PySpy logging.",
+    )
     parser.add_argument("--runs-dir", type=str, default="data/log/runs")
     parser.add_argument(
         "--group-id",
@@ -275,7 +281,9 @@ def sub_wb_query(cmd, proj_cfg):
             for match in result:
                 del match["rank"]
                 if len(match) > 1:
-                    raise ValueError(f"Only single value query supported, got {match}")
+                    raise ValueError(
+                        f"Only single value query supported, got {match}"
+                    )
                 sub_val = list(match.values())[0]
                 sub_vals.append(sub_val)
 
@@ -359,12 +367,21 @@ def execute_command_file(run_cmd, args, proj_cfg):
     if add_all is not None and not args.skip_add_all:
         cmds = [sub_in_args(cmd, add_all) for cmd in cmds]
 
+    if args.time_freq is None:
+        pyspy_s = ""
+    else:
+        pyspy_s = f"py-spy record --idle --function --native --subprocesses --rate {args.time_freq} --output data/profile/scope.speedscope --format speedscope -- "
+
+    cmds = [f"{pyspy_s}{x}" for x in cmds]
+
     # Add on the project data
     if args.proj_dat is not None:
         proj_data = proj_cfg.get("proj_data", {})
         for k in args.proj_dat.split(","):
             cmds = [sub_in_args(cmd, proj_data[k]) for cmd in cmds]
-            env_var_dat = proj_cfg.get("proj_dat_add_env_vars", {}).get(k, None)
+            env_var_dat = proj_cfg.get("proj_dat_add_env_vars", {}).get(
+                k, None
+            )
             if env_var_dat is not None:
                 cmds = [env_var_dat + " " + cmd for cmd in cmds]
 
@@ -438,7 +455,9 @@ def execute_command_file(run_cmd, args, proj_cfg):
                     pane.send_keys("source activate " + proj_cfg["conda_env"])
                 pane.enter()
                 if cd[cmd_idx] != "-1":
-                    pane.send_keys("export CUDA_VISIBLE_DEVICES=" + cd[cmd_idx])
+                    pane.send_keys(
+                        "export CUDA_VISIBLE_DEVICES=" + cd[cmd_idx]
+                    )
                     pane.enter()
                 else:
                     pane.send_keys(run_cmd)
@@ -482,7 +501,9 @@ def generate_slurm_batch_file(
 
         if args.proj_dat is not None:
             for k in args.proj_dat.split(","):
-                env_var_dat = proj_cfg.get("proj_dat_add_env_vars", {}).get(k, None)
+                env_var_dat = proj_cfg.get("proj_dat_add_env_vars", {}).get(
+                    k, None
+                )
                 if env_var_dat is not None:
                     proj_env_vars = env_var_dat.split(" ")
                     for proj_env_var in proj_env_vars:
