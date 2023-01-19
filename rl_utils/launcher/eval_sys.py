@@ -106,6 +106,7 @@ def eval_ckpt(
             add_env_vars.append(
                 cfg.get("proj_dat_add_env_vars", {}).get(k, "")
             )
+
     cmd_parts = cmd_parts[1:]
     cmd_parts = [*add_env_vars, *cmd_parts]
 
@@ -155,6 +156,7 @@ def run(
         full_path = osp.join(
             cfg.base_data_dir, eval_sys_cfg.ckpt_search_dir, run_id
         )
+
         ckpt_idxs = [
             int(f.split(".")[1])
             for f in os.listdir(full_path)
