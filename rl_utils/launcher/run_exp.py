@@ -209,9 +209,9 @@ def get_random_id() -> str:
 
 
 def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg):
-    conda_env = proj_cfg["conda_env"]
+    conda_env = proj_cfg.get("conda_env", None)
 
-    if args.conda_env is None:
+    if args.conda_env is None and conda_env is not None:
         python_path = osp.join(
             osp.expanduser("~"), "miniconda3", "envs", conda_env, "bin"
         )
@@ -344,8 +344,8 @@ def sub_in_vars(cmd, proj_cfg, rank_i, group_id, override_base_data_dir=None):
             else override_base_data_dir,
         )
         .replace("$CMD_RANK", str(rank_i))
-        .replace("$PROJECT_NAME", proj_cfg.proj_name)
-        .replace("$WB_ENTITY", proj_cfg.wb_entity)
+        .replace("$PROJECT_NAME", proj_cfg.get("proj_name", ""))
+        .replace("$WB_ENTITY", proj_cfg.get("wb_entity", ""))
     )
 
 
