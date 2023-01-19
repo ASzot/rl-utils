@@ -1,5 +1,5 @@
 import argparse
-from typing import Tuple
+from typing import Dict, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,20 +15,43 @@ ERROR_VAL = 0.3444
 
 
 def plot_bar(
-    plot_df,
-    group_key,
-    plot_key,
-    name_ordering=None,
+    plot_df: pd.DataFrame,
+    group_key: str,
+    plot_key: str,
+    name_ordering: Optional[str] = None,
     name_colors=None,
-    rename_map=None,
-    show_ticks=True,
-    axis_font_size=14,
+    rename_map: Optional[Dict[str, str]] = None,
+    show_ticks: bool = True,
+    tic_font_size: int = 14,
+    axis_font_size: int = 14,
+    legend_font_size: int = 14,
     y_disp_bounds: Tuple[float, float] = None,
-    title="",
+    title: str = "",
     error_scaling=1.0,
-    missing_fill_value=MISSING_VAL,
-    error_fill_value=ERROR_VAL,
+    missing_fill_value: float = MISSING_VAL,
+    error_fill_value: float = ERROR_VAL,
+    bar_group_key: Optional[str] = None,
+    base_bar_width: float = 0.35,
+    bar_darkness: float = 0.2,
+    bar_alpha: float = 0.9,
+    bar_pad: float = 0.2,
+    within_group_padding: float = 0.01,
+    group_colors: Optional[Dict[str, Tuple[float, float, float]]] = None,
+    legend: bool = False,
+    xlabel: Optional[str] = None,
+    xlabel_rot: int = 30,
 ):
+    """
+    :param group_key: The key to take the average/std over. Likely the method key.
+    :param name_ordering: Order of the names on the x-axis.
+    :param bar_pad: Distance between bar groups
+    :param within_group_padding: Distance between bars within bar group.
+    :param bar_group_key: Group columns next to each other.
+    :param base_bar_width: Bar width. Scaled by the # of bars per group.
+    :param group_colors: Maps the bar group key to a color (RGB float tuple
+        [0,1]). Overrides `name_colors`.
+    :param xlabel_rot: The rotation (in degrees) of the labels on the x-axis.
+    """
 
     def_idx = [(k, i) for i, k in enumerate(plot_df[group_key].unique())]
     if name_ordering is None:
@@ -43,62 +66,67 @@ def plot_bar(
     plot_df = plot_df.replace("error", error_fill_value)
     plot_df[plot_key] = plot_df[plot_key].astype("float")
 
-    df_avg_y = plot_df.groupby(group_key).mean()
-    df_std_y = plot_df.groupby(group_key).std()
+    bar_grouped = plot_df.groupby(bar_group_key)
+    num_grouped = len(bar_grouped)
 
-    avg_y = []
-    std_y = []
-    name_ordering = [n for n in name_ordering if n in df_avg_y.index]
-    is_missing = []
-    is_error = []
-    for name in name_ordering:
-        is_missing.append(df_avg_y[plot_key].loc[name] == missing_fill_value)
-        is_error.append(df_avg_y[plot_key].loc[name] == error_fill_value)
-        avg_y.append(df_avg_y.loc[name][plot_key])
-        std_y.append(df_std_y.loc[name][plot_key] * error_scaling)
-
-    bar_width = 0.35
-    bar_darkness = 0.2
-    bar_alpha = 0.9
-    bar_pad = 0.0
-    use_x = np.arange(len(name_ordering))
-    colors = [name_colors[x] for x in name_ordering]
-
-    N = len(avg_y)
+    bar_width = base_bar_width / num_grouped
     start_x = 0.0
-    end_x = round(start_x + N * (bar_width + bar_pad), 3)
-
-    use_x = np.linspace(start_x, end_x, N)
+    within_group_spacing = bar_width + within_group_padding
 
     fig, ax = plt.subplots()
+    for bar_group_name, sub_df in bar_grouped:
+        df_avg_y = sub_df.groupby(group_key).mean()
+        df_std_y = sub_df.groupby(group_key).std()
 
-    bars = ax.bar(
-        use_x,
-        avg_y,
-        width=bar_width,
-        color=colors,
-        align="center",
-        alpha=bar_alpha,
-        yerr=std_y,
-        edgecolor=(0, 0, 0, 1.0),
-        error_kw={
-            "ecolor": (bar_darkness, bar_darkness, bar_darkness, 1.0),
-            "lw": 2,
-            "capsize": 3,
-            "capthick": 2,
-        },
-    )
-    for i, bar in enumerate(bars):
-        if is_missing[i]:
-            missing_opacity = 0.1
-            # prev_color = bar.get_facecolor()
-            bar.set_edgecolor((1, 0, 0, missing_opacity))
-            bar.set_hatch("//")
-        elif is_error[i]:
-            missing_opacity = 0.1
-            # prev_color = bar.get_facecolor()
-            bar.set_edgecolor((0, 0, 1, missing_opacity))
-            bar.set_hatch("//")
+        avg_y = []
+        std_y = []
+        name_ordering = [n for n in name_ordering if n in df_avg_y.index]
+        is_missing = []
+        is_error = []
+        for name in name_ordering:
+            is_missing.append(df_avg_y[plot_key].loc[name] == missing_fill_value)
+            is_error.append(df_avg_y[plot_key].loc[name] == error_fill_value)
+            avg_y.append(df_avg_y.loc[name][plot_key])
+            std_y.append(df_std_y.loc[name][plot_key] * error_scaling)
+        if group_colors is None:
+            colors = [name_colors[x] for x in name_ordering]
+        else:
+            colors = [group_colors[bar_group_name] for _ in name_ordering]
+
+        N = len(avg_y)
+        end_x = round(start_x + N * (bar_width + bar_pad), 3)
+
+        use_x = np.linspace(start_x, end_x, N)
+
+        bars = ax.bar(
+            use_x,
+            avg_y,
+            width=bar_width,
+            color=colors,
+            align="center",
+            alpha=bar_alpha,
+            yerr=std_y,
+            edgecolor=(0, 0, 0, 1.0),
+            error_kw={
+                "ecolor": (bar_darkness, bar_darkness, bar_darkness, 1.0),
+                "lw": 2,
+                "capsize": 3,
+                "capthick": 2,
+            },
+            label=rename_map.get(bar_group_name, bar_group_name),
+        )
+        start_x += within_group_spacing
+        for i, bar in enumerate(bars):
+            if is_missing[i]:
+                missing_opacity = 0.1
+                # prev_color = bar.get_facecolor()
+                bar.set_edgecolor((1, 0, 0, missing_opacity))
+                bar.set_hatch("//")
+            elif is_error[i]:
+                missing_opacity = 0.1
+                # prev_color = bar.get_facecolor()
+                bar.set_edgecolor((0, 0, 1, missing_opacity))
+                bar.set_hatch("//")
 
     if show_ticks:
         xtic_names = [rename_map.get(x, x) for x in name_ordering]
@@ -107,12 +135,18 @@ def plot_bar(
 
     xtic_locs = use_x
     ax.set_xticks(xtic_locs)
-    ax.set_xticklabels(xtic_names, rotation=30)
+    ax.set_xticklabels(xtic_names, rotation=xlabel_rot, fontsize=tic_font_size)
     ax.set_ylabel(rename_map.get(plot_key, plot_key), fontsize=axis_font_size)
+    if xlabel is not None:
+        ax.set_xlabel(xlabel, fontsize=axis_font_size)
     if y_disp_bounds is not None:
         ax.set_ylim(*y_disp_bounds)
     if title != "":
         ax.set_title(title)
+    if legend:
+        ax.legend(fontsize=legend_font_size)
+    for lab in ax.get_yticklabels():
+        lab.set_fontsize(tic_font_size)
     return fig
 
 

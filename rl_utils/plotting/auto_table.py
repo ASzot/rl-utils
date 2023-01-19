@@ -61,11 +61,10 @@ def plot_table(
     15     50   mirl eval               1.0000
     16     50   mirl eval               0.7200
     ```
-    `col_key='type', row_key='demcount',
-    cell_key='final_train_success'` plots the # of demos as rows and
-    the type as columns with the final_train_success values as the cell
-    values. Duplicate row and columns are automatically grouped
-    together.
+    `col_key='type', row_key='demcount', cell_key='final_train_success'` plots
+    the # of demos as rows and the type as columns with the final_train_success
+    values as the cell values. Duplicate row and columns are automatically
+    grouped together.
 
     """
     df[cell_key] = df[cell_key] * value_scaling
@@ -145,7 +144,8 @@ def plot_table(
                     err = ""
                     if include_err:
                         err = f"$ \\pm$ %.{n_decimals}f " % std
-                    txt = f" %.{n_decimals}f {{\\scriptsize}}{err} " % val
+                        err = f"{{\\scriptsize {err} }}"
+                    txt = f" %.{n_decimals}f {err}" % val
 
                     if col_k == sel_col:
                         txt = "\\textbf{ " + txt + " }"

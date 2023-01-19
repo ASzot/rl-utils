@@ -32,6 +32,12 @@ def get_arg_parser():
     )
     parser.add_argument("--proj-dat", type=str, default=None)
     parser.add_argument("--conda-env", type=str, default=None)
+    parser.add_argument(
+        "--time-freq",
+        type=int,
+        default=None,
+        help="Sampling frequency for pyspy. If set, this will enable PySpy logging.",
+    )
     parser.add_argument("--runs-dir", type=str, default="data/log/runs")
     parser.add_argument(
         "--group-id",
@@ -203,9 +209,9 @@ def get_random_id() -> str:
 
 
 def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg):
-    conda_env = proj_cfg["conda_env"]
+    conda_env = proj_cfg.get("conda_env", None)
 
-    if args.conda_env is None:
+    if args.conda_env is None and conda_env is not None:
         python_path = osp.join(
             osp.expanduser("~"), "miniconda3", "envs", conda_env, "bin"
         )
@@ -336,8 +342,8 @@ def sub_in_vars(cmd, proj_cfg, rank_i, group_id, override_base_data_dir=None):
             else override_base_data_dir,
         )
         .replace("$CMD_RANK", str(rank_i))
-        .replace("$PROJECT_NAME", proj_cfg.proj_name)
-        .replace("$WB_ENTITY", proj_cfg.wb_entity)
+        .replace("$PROJECT_NAME", proj_cfg.get("proj_name", ""))
+        .replace("$WB_ENTITY", proj_cfg.get("wb_entity", ""))
     )
 
 
@@ -358,6 +364,13 @@ def execute_command_file(run_cmd, args, proj_cfg):
     add_all = proj_cfg.get("add_all", None)
     if add_all is not None and not args.skip_add_all:
         cmds = [sub_in_args(cmd, add_all) for cmd in cmds]
+
+    if args.time_freq is None:
+        pyspy_s = ""
+    else:
+        pyspy_s = f"py-spy record --idle --function --native --subprocesses --rate {args.time_freq} --output data/profile/scope.speedscope --format speedscope -- "
+
+    cmds = [f"{pyspy_s}{x}" for x in cmds]
 
     # Add on the project data
     if args.proj_dat is not None:

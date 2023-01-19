@@ -36,6 +36,7 @@ Arguments
 * `--sess-id`: tmux session ID to attach to (by default none).
 * `--group-id`: Add a group prefix to the runs.
 * `--run-single`: Run several commands sequentially.
+* `--time-freq X`: Run with `pyspy` timing at frequency `X`. Will save the profile to `data/profile/scope.speedscope`.
 
 Slurm arguments:
 * `--g`: Number of SLURM GPUs.
@@ -119,7 +120,7 @@ Argument description:
 
 ## Auto Bar
 Config Schema:
-```
+```yaml
 methods:
   st_pop: K94569d43
   im_pop: Rb2cd0028
