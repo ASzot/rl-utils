@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from omegaconf import OmegaConf
 
-from rl_utils.launcher.run_exp import sub_in_vars, get_random_id
+from rl_utils.launcher.run_exp import sub_in_vars, get_random_id, sub_in_args
 
 RUN_DIR = "data/log/runs/"
 
@@ -62,15 +62,20 @@ def eval_ckpt(
         cmd_parts = split_cmd_txt(cmd)
     else:
         cmd = eval_sys_cfg.eval_run_cmd
+        add_all = cfg.get("add_all", None)
+        if add_all is not None:
+            cmd = sub_in_args(cmd, add_all)
+        cmd = sub_in_vars(cmd, cfg, 0, "eval")
+        ident = get_random_id()
+        cmd = cmd.replace("$SLURM_ID", ident)
+
         cmd_parts = split_cmd_txt(cmd)
         # Dummy line for srun
         cmd_parts.insert(0, "")
 
     def add_eval_suffix(x):
         x = x.strip()
-        if x == "":
-            return get_random_id() + "_eval"
-        elif "." in x:
+        if "." in x:
             parts = x.split(".")
             return parts[0] + "_eval." + parts[1]
         elif x[-1] == "/":
