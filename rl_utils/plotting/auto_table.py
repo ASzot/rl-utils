@@ -20,9 +20,7 @@ def plot_table(
     n_decimals=2,
     missing_fill_value=MISSING_VALUE,
     error_fill_value=0.3444,
-    get_row_highlight: Optional[
-        Callable[[str, pd.DataFrame], Optional[str]]
-    ] = None,
+    get_row_highlight: Optional[Callable[[str, pd.DataFrame], Optional[str]]] = None,
     make_col_header: Optional[Callable[[int], str]] = None,
     x_label: str = "",
     y_label: str = "",
@@ -122,9 +120,7 @@ def plot_table(
 
         if show_row_labels:
             if bold_row_names:
-                row_str.append(
-                    "\\textbf{%s}" % clean_text(renames.get(row_k, row_k))
-                )
+                row_str.append("\\textbf{%s}" % clean_text(renames.get(row_k, row_k)))
             else:
                 row_str.append(clean_text(renames.get(row_k, row_k)))
 
@@ -183,9 +179,7 @@ def plot_table(
         toprule = ""
 
     if x_label != "":
-        toprule += (
-            "& \\multicolumn{%i}{c}{%s}" % (n_columns, x_label)
-        ) + row_sep
+        toprule += ("& \\multicolumn{%i}{c}{%s}" % (n_columns, x_label)) + row_sep
 
     ret_s = ""
     if add_tabular:

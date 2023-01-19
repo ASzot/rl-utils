@@ -6,14 +6,12 @@ from typing import Any, Callable, Dict, List, Optional
 
 from omegaconf import OmegaConf
 
-from rl_utils.launcher.run_exp import sub_in_vars, get_random_id, sub_in_args
+from rl_utils.launcher.run_exp import get_random_id, sub_in_args, sub_in_vars
 
 RUN_DIR = "data/log/runs/"
 
 
-def change_arg_vals(
-    cmd_parts: List[str], new_arg_values: Dict[str, Any]
-) -> List[str]:
+def change_arg_vals(cmd_parts: List[str], new_arg_values: Dict[str, Any]) -> List[str]:
     """
     If the argument value does not exist, it will be added.
     :param new_arg_values: If the value is a function, it will take as input
@@ -103,9 +101,7 @@ def eval_ckpt(
     if proj_dat is not None:
         for k in proj_dat.split(","):
             cmd_parts.extend(split_cmd_txt(cfg.proj_data[k]))
-            add_env_vars.append(
-                cfg.get("proj_dat_add_env_vars", {}).get(k, "")
-            )
+            add_env_vars.append(cfg.get("proj_dat_add_env_vars", {}).get(k, ""))
 
     cmd_parts = cmd_parts[1:]
     cmd_parts = [*add_env_vars, *cmd_parts]
@@ -153,9 +149,7 @@ def run(
     eval_sys_cfg = cfg.eval_sys
     runs = args.runs.split(",")
     for run_id in runs:
-        full_path = osp.join(
-            cfg.base_data_dir, eval_sys_cfg.ckpt_search_dir, run_id
-        )
+        full_path = osp.join(cfg.base_data_dir, eval_sys_cfg.ckpt_search_dir, run_id)
 
         ckpt_idxs = [
             int(f.split(".")[1])
