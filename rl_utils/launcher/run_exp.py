@@ -235,7 +235,6 @@ def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg):
         env_vars = " ".join(proj_cfg["add_env_vars"])
         return f"{env_vars} {cmd}"
     else:
-
         if not args.slurm_no_batch:
             run_file, run_name = generate_slurm_batch_file(
                 log_file,
@@ -375,8 +374,16 @@ def execute_command_file(run_cmd, args, proj_cfg):
     # Add on the project data
     if args.proj_dat is not None:
         proj_data = proj_cfg.get("proj_data", {})
+
+        def sub_in_proj_dat(cmd, k):
+            if k not in proj_data:
+                raise ValueError(
+                    f"Could not find {k} in proj-data which contains {list(proj_data.keys())}"
+                )
+            return sub_in_args(cmd, proj_data[k])
+
         for k in args.proj_dat.split(","):
-            cmds = [sub_in_args(cmd, proj_data[k]) for cmd in cmds]
+            cmds = [sub_in_proj_dat(cmd, k) for cmd in cmds]
             env_var_dat = proj_cfg.get("proj_dat_add_env_vars", {}).get(k, None)
             if env_var_dat is not None:
                 cmds = [env_var_dat + " " + cmd for cmd in cmds]
@@ -427,7 +434,6 @@ def execute_command_file(run_cmd, args, proj_cfg):
                 f"Running multiple jobs. You must specify tmux session id. Tried to run {cmds}"
             )
     else:
-
         if args.run_single:
             cmds = DELIM.join(cmds)
             cmds = [cmds]

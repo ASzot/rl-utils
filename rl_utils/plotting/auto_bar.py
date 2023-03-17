@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from omegaconf import OmegaConf
-
 from rl_utils.plotting.utils import fig_save
 from rl_utils.plotting.wb_query import batch_query
 
@@ -40,6 +39,7 @@ def plot_bar(
     legend: bool = False,
     xlabel: Optional[str] = None,
     xlabel_rot: int = 30,
+    include_err: bool = True,
 ):
     """
     :param group_key: The key to take the average/std over. Likely the method key.
@@ -51,6 +51,7 @@ def plot_bar(
     :param group_colors: Maps the bar group key to a color (RGB float tuple
         [0,1]). Overrides `name_colors`.
     :param xlabel_rot: The rotation (in degrees) of the labels on the x-axis.
+    :param include_err: Whether to include error bars.
     """
 
     def_idx = [(k, i) for i, k in enumerate(plot_df[group_key].unique())]
@@ -84,7 +85,9 @@ def plot_bar(
         is_missing = []
         is_error = []
         for name in name_ordering:
-            is_missing.append(df_avg_y[plot_key].loc[name] == missing_fill_value)
+            is_missing.append(
+                df_avg_y[plot_key].loc[name] == missing_fill_value
+            )
             is_error.append(df_avg_y[plot_key].loc[name] == error_fill_value)
             avg_y.append(df_avg_y.loc[name][plot_key])
             std_y.append(df_std_y.loc[name][plot_key] * error_scaling)
@@ -97,6 +100,18 @@ def plot_bar(
         end_x = round(start_x + N * (bar_width + bar_pad), 3)
 
         use_x = np.linspace(start_x, end_x, N)
+        kwargs = {}
+        if include_err:
+            std_y = np.nan_to_num(std_y, nan=0.0)
+            kwargs = dict(
+                yerr=std_y,
+                error_kw={
+                    "ecolor": (bar_darkness, bar_darkness, bar_darkness, 1.0),
+                    "lw": 2,
+                    "capsize": 3,
+                    "capthick": 2,
+                },
+            )
 
         bars = ax.bar(
             use_x,
@@ -105,15 +120,9 @@ def plot_bar(
             color=colors,
             align="center",
             alpha=bar_alpha,
-            yerr=std_y,
             edgecolor=(0, 0, 0, 1.0),
-            error_kw={
-                "ecolor": (bar_darkness, bar_darkness, bar_darkness, 1.0),
-                "lw": 2,
-                "capsize": 3,
-                "capthick": 2,
-            },
             label=rename_map.get(bar_group_name, bar_group_name),
+            **kwargs,
         )
         start_x += within_group_spacing
         for i, bar in enumerate(bars):
