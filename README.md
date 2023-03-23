@@ -1,25 +1,10 @@
-# Reinforcement Learning Research Utilities
-
-A library of helper functions, environment helpers, and experiment management functions for RL research.
-* `launcher`: scripts to launch slurm jobs.
-* `envs` utility to setup vectorized environments in RL.
-    * `envs/pointmass` A toy navigation task implemented in PyTorch.
-* `logging` Weights&Biases, CLI, or Tensorboard logging interfaces.
-* `models` useful model components for RL policy networks.
-* `common`: helpers to manipulate observation and action spaces, standardize policy evaluation, and help with visualizing policy rollouts.
-* `plotting`
-    * `wb_query`: CLI for extracting information from Weights&Biases.
-
+# RL Job Launcher and Plotting Utilities
 
 # Installation
 Requires Python >= 3.7.
 
 * `pip install rl-exp-utils`
 * To install from source: `git clone https://github.com/ASzot/rl-utils.git && cd rl-utils && git install -e .`
-
-# Environments
-Toy environments to test algorithms.
-* [Point Mass Navigation](https://github.com/ASzot/rl-helper/tree/main/rl_utils/envs/pointmass)
 
 # Experiment Launcher
 Utility script to launch jobs on Slurm (either via sbatch or srun), in a new tmux window, with PyTorch distributed, or in the current shell.
@@ -137,3 +122,9 @@ Selectable fields:
 
 - `summary`: The metrics for the model at the end of training. Also the run state. Useful if you want to check run result.
 - Any other key: If the key is none of the above, then it will get the relevant key from the `summary` dict in the run (the final value).
+
+# Environments
+Toy environments to test algorithms.
+* [Point Mass Navigation](https://github.com/ASzot/rl-helper/tree/main/rl_utils/envs/pointmass)
+
+

@@ -3,7 +3,6 @@ from typing import Callable, Dict, List, Optional
 
 import pandas as pd
 from omegaconf import OmegaConf
-
 from rl_utils.plotting.utils import MISSING_VALUE
 from rl_utils.plotting.wb_query import fetch_data_from_cfg
 
@@ -34,6 +33,15 @@ def plot_table(
     show_col_labels: bool = True,
     compute_err_fn: Optional[Callable[[pd.Series], pd.Series]] = None,
     value_scaling: float = 1.0,
+    custom_cell_format_fn: Optional[
+        Callable[
+            [
+                float,
+                float,
+            ],
+            str,
+        ]
+    ] = None,
 ):
     """
     :param df: The index of the data frame does not matter, only the row values and column names matter.
@@ -141,14 +149,17 @@ def plot_table(
                 elif val == error_fill_value:
                     row_str.append("E")
                 else:
-                    err = ""
-                    if include_err:
-                        err = f"$ \\pm$ %.{n_decimals}f " % std
-                        err = f"{{\\scriptsize {err} }}"
-                    txt = f" %.{n_decimals}f {err}" % val
+                    if custom_cell_format_fn is None:
+                        err = ""
+                        if include_err:
+                            err = f"$ \\pm$ %.{n_decimals}f " % std
+                            err = f"{{\\scriptsize {err} }}"
+                        txt = f" %.{n_decimals}f {err}" % val
 
-                    if col_k == sel_col:
-                        txt = "\\textbf{ " + txt + " }"
+                        if col_k == sel_col:
+                            txt = "\\textbf{ " + txt + " }"
+                    else:
+                        txt = custom_cell_format_fn(val, err)
                     row_str.append(txt)
 
         all_s.append(col_sep.join(row_str))
