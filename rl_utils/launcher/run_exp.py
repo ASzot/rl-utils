@@ -5,6 +5,8 @@ import random
 import string
 import uuid
 
+import yaml
+
 try:
     import libtmux
 except ImportError:
@@ -31,6 +33,7 @@ def get_arg_parser():
         help="tmux session name to connect to",
     )
     parser.add_argument("--proj-dat", type=str, default=None)
+    parser.add_argument("--check", action="store_true")
     parser.add_argument("--conda-env", type=str, default=None)
     parser.add_argument(
         "--time-freq",
@@ -80,6 +83,10 @@ def get_arg_parser():
     # MULTIPROC OPTIONS
     parser.add_argument("--pt-proc", type=int, default=-1)
 
+    # YAML LAUNCH OPTIONS
+    parser.add_argument("--template", action="store_true")
+    parser.add_argument("--secrets", type=str, default="")
+
     # SLURM OPTIONS
     parser.add_argument("--comment", type=str, default=None)
     parser.add_argument(
@@ -122,7 +129,7 @@ def get_arg_parser():
     parser.add_argument(
         "--c",
         type=str,
-        default=None,
+        default="7",
         help="""
             Number of cpus for SLURM job
             """,
@@ -208,7 +215,7 @@ def get_random_id() -> str:
     return random.choice(string.ascii_uppercase) + rnd_id
 
 
-def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg):
+def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg, ident=None):
     conda_env = proj_cfg.get("conda_env", None)
 
     if args.conda_env is None and conda_env is not None:
@@ -225,9 +232,10 @@ def get_cmd_run_str(cmd, args, cmd_idx, num_cmds, proj_cfg):
         ntasks = g[:]
     else:
         ntasks = as_list(args.ntasks, num_cmds)
-    ident = get_random_id()
-    if args.name_prefix is not None:
-        ident = args.name_prefix + "_" + ident
+    if ident is None:
+        ident = get_random_id()
+        if args.name_prefix is not None:
+            ident = args.name_prefix + "_" + ident
     log_file = osp.join(args.runs_dir, ident) + ".log"
     cmd = cmd.replace("$SLURM_ID", ident)
 
@@ -346,6 +354,29 @@ def sub_in_vars(cmd, proj_cfg, rank_i, group_id, override_base_data_dir=None):
     )
 
 
+def yamlize_cmd(cmd, template_cfg, args, ident):
+    cmd = cmd.replace("python", template_cfg["python_path"])
+    with open(template_cfg.template, "r") as f:
+        base_template = yaml.safe_load(f)
+    path = osp.join(args.runs_dir, get_random_id() + ".yaml")
+    secrets = args.secrets.split(",")
+    for secret in secrets:
+        k, v = secret.split("=")
+        base_template["environment_variables"][k] = v
+    base_template["name"] = ident
+    base_template["command"] = cmd
+    base_template["resources"]["num_gpus"] = int(args.g)
+    with open(path, "w") as f:
+        yaml.dump(
+            base_template,
+            f,
+            indent=4,
+            sort_keys=False,
+        )
+
+    return path
+
+
 def execute_command_file(run_cmd, args, proj_cfg):
     if not osp.exists(args.runs_dir):
         os.makedirs(args.runs_dir)
@@ -410,25 +441,41 @@ def execute_command_file(run_cmd, args, proj_cfg):
 
     cd = as_list(args.cd, n_cmds)
 
-    if args.sess_id == -1 and args.sess_name is None:
+    def launch(cmd):
+        if not args.check:
+            os.system(cmd)
+
+    if args.template:
+        template_cfg = proj_cfg["yaml_launch"]
+        template_cmd = template_cfg["cmd"]
+        for cmd_idx, cmd in enumerate(cmds):
+            ident = get_random_id()
+            if args.name_prefix is not None:
+                ident = args.name_prefix + "_" + ident
+            run_cmd = get_cmd_run_str(cmd, args, cmd_idx, n_cmds, proj_cfg, ident)
+            run_cmd = template_cmd % yamlize_cmd(run_cmd, template_cfg, args, ident)
+            log(f"Running {run_cmd}", args)
+            launch(run_cmd)
+
+    elif args.sess_id == -1 and args.sess_name is None:
         if args.partition is not None:
             for cmd_idx, cmd in enumerate(cmds):
                 run_cmd = get_cmd_run_str(cmd, args, cmd_idx, n_cmds, proj_cfg)
                 log(f"Running {run_cmd}", args)
-                os.system(run_cmd)
+                launch(run_cmd)
         elif args.run_single:
             cmds = [get_cmd_run_str(x, args, 0, 1, proj_cfg) for x in cmds]
             exec_cmd = DELIM.join(cmds)
 
             log(f"Running {exec_cmd}", args)
-            os.system(exec_cmd)
+            launch(exec_cmd)
 
         elif n_cmds == 1:
             exec_cmd = get_cmd_run_str(cmds[0], args, 0, n_cmds, proj_cfg)
             if cd[0] != "-1":
                 exec_cmd = "CUDA_VISIBLE_DEVICES=" + cd[0] + " " + exec_cmd
             log(f"Running {exec_cmd}", args)
-            os.system(exec_cmd)
+            launch(exec_cmd)
         else:
             raise ValueError(
                 f"Running multiple jobs. You must specify tmux session id. Tried to run {cmds}"
