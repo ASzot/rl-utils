@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from omegaconf import OmegaConf
-
 from rl_utils.plotting.utils import fig_save
 from rl_utils.plotting.wb_query import batch_query
 
@@ -86,7 +85,9 @@ def plot_bar(
         is_missing = []
         is_error = []
         for name in name_ordering:
-            is_missing.append(df_avg_y[plot_key].loc[name] == missing_fill_value)
+            is_missing.append(
+                df_avg_y[plot_key].loc[name] == missing_fill_value
+            )
             is_error.append(df_avg_y[plot_key].loc[name] == error_fill_value)
             avg_y.append(df_avg_y.loc[name][plot_key])
             std_y.append(df_std_y.loc[name][plot_key] * error_scaling)
@@ -102,6 +103,7 @@ def plot_bar(
         kwargs = {}
         if include_err:
             std_y = np.nan_to_num(std_y, nan=0.0)
+
             kwargs = {
                 "yerr": std_y,
                 "error_kw": {
