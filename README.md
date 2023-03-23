@@ -126,5 +126,3 @@ Selectable fields:
 # Environments
 Toy environments to test algorithms.
 * [Point Mass Navigation](https://github.com/ASzot/rl-helper/tree/main/rl_utils/envs/pointmass)
-
-

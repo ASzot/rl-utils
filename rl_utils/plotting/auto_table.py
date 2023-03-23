@@ -3,6 +3,7 @@ from typing import Callable, Dict, List, Optional
 
 import pandas as pd
 from omegaconf import OmegaConf
+
 from rl_utils.plotting.utils import MISSING_VALUE
 from rl_utils.plotting.wb_query import fetch_data_from_cfg
 
