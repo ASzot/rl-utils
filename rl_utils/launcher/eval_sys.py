@@ -54,12 +54,17 @@ def eval_ckpt(
     # Find the run command.
     run_path = osp.join(RUN_DIR, run_id + ".sh")
     if osp.exists(run_path):
+        print("Substituting slurm run command.")
         # Get the actually executed command.
         with open(run_path, "r") as f:
             cmd = f.readlines()[-1]
         cmd_parts = split_cmd_txt(cmd)
     else:
-        cmd = eval_sys_cfg.eval_run_cmd
+        print("Substituting in the run command.")
+        if args.cmd is None:
+            cmd = eval_sys_cfg.eval_run_cmd
+        else:
+            cmd = eval_sys_cfg.eval_run_cmd[args.cmd]
         add_all = cfg.get("add_all", None)
         if add_all is not None:
             cmd = sub_in_args(cmd, add_all)
@@ -139,6 +144,7 @@ def run(
     parser.add_argument("--runs", default=None, type=str)
     parser.add_argument("--proj-dat", default=None, type=str)
     parser.add_argument("--idx", default=None, type=int)
+    parser.add_argument("--cmd", default=None, type=str)
     parser.add_argument("--cfg", required=True, type=str)
     parser.add_argument("--debug", action="store_true")
     if add_args_fn is not None:

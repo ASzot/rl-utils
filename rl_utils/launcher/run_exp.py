@@ -129,7 +129,7 @@ def get_arg_parser():
     parser.add_argument(
         "--c",
         type=str,
-        default="7",
+        default=None,
         help="""
             Number of cpus for SLURM job
             """,
@@ -355,15 +355,20 @@ def sub_in_vars(cmd, proj_cfg, rank_i, group_id, override_base_data_dir=None):
 
 
 def yamlize_cmd(cmd, template_cfg, args, ident):
-    cmd = cmd.replace("python", template_cfg["python_path"])
+    for key, val in template_cfg["sub_paths"].items():
+        cmd = cmd.replace(key, val)
     with open(template_cfg.template, "r") as f:
         base_template = yaml.safe_load(f)
     path = osp.join(args.runs_dir, get_random_id() + ".yaml")
     secrets = args.secrets.split(",")
     for secret in secrets:
+        if secret == "":
+            continue
         k, v = secret.split("=")
         base_template["environment_variables"][k] = v
     base_template["name"] = ident
+    if "prefix_cmd" in template_cfg:
+        cmd = template_cfg.prefix_cmd + " " + cmd
     base_template["command"] = cmd
     base_template["resources"]["num_gpus"] = int(args.g)
     with open(path, "w") as f:
@@ -378,6 +383,9 @@ def yamlize_cmd(cmd, template_cfg, args, ident):
 
 
 def execute_command_file(run_cmd, args, proj_cfg):
+    if args.c is None:
+        args.c = "7"
+
     if not osp.exists(args.runs_dir):
         os.makedirs(args.runs_dir)
 
@@ -630,8 +638,5 @@ def full_execute_command_file():
 
         if args.cpu_mem is None and "cpu_mem" in def_slurm:
             args.cpu_mem = def_slurm["cpu_mem"]
-
-    if args.c is None:
-        args.c = "7"
 
     execute_command_file(rest, args, proj_cfg)
