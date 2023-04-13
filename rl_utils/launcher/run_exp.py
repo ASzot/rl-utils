@@ -129,7 +129,7 @@ def get_arg_parser():
     parser.add_argument(
         "--c",
         type=str,
-        default=None,
+        default="7",
         help="""
             Number of cpus for SLURM job
             """,
