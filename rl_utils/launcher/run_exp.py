@@ -394,9 +394,6 @@ def execute_command_file(run_cmd, args, proj_cfg):
     # Sub in W&B args
     cmds = [c for cmd in cmds for c in sub_wb_query(cmd, proj_cfg)]
 
-    # Split the commands.
-    cmds = [c for cmd in cmds for c in split_cmd(cmd)]
-
     n_cmds = len(cmds)
 
     add_all = proj_cfg.get("add_all", None)
@@ -624,7 +621,7 @@ def full_execute_command_file():
     slurm_cfg = proj_cfg.get("slurm", {})
     if args.slurm is not None:
         def_slurm = slurm_cfg[args.slurm]
-        if args.c is None and "c" in def_slurm:
+        if "c" in def_slurm:
             args.c = def_slurm["c"]
 
         if args.time is None and "time" in def_slurm:
