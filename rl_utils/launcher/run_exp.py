@@ -82,6 +82,7 @@ def get_arg_parser():
 
     # MULTIPROC OPTIONS
     parser.add_argument("--pt-proc", type=int, default=-1)
+    parser.add_argument("--rdzv-endpoint", type=str, default=None)
 
     # YAML LAUNCH OPTIONS
     parser.add_argument("--template", action="store_true")
@@ -394,9 +395,6 @@ def execute_command_file(run_cmd, args, proj_cfg):
     # Sub in W&B args
     cmds = [c for cmd in cmds for c in sub_wb_query(cmd, proj_cfg)]
 
-    # Split the commands.
-    cmds = [c for cmd in cmds for c in split_cmd(cmd)]
-
     n_cmds = len(cmds)
 
     add_all = proj_cfg.get("add_all", None)
@@ -439,6 +437,8 @@ def execute_command_file(run_cmd, args, proj_cfg):
 
     if args.pt_proc != -1:
         pt_dist_str = f"torchrun --nproc_per_node {args.pt_proc}"
+        if args.rdzv_endpoint is not None:
+            pt_dist_str += f" --rdzv-endpoint={args.rdzv_endpoint}"
 
         def make_dist_cmd(x):
             return x.replace("python", pt_dist_str)
@@ -624,7 +624,7 @@ def full_execute_command_file():
     slurm_cfg = proj_cfg.get("slurm", {})
     if args.slurm is not None:
         def_slurm = slurm_cfg[args.slurm]
-        if args.c is None and "c" in def_slurm:
+        if "c" in def_slurm:
             args.c = def_slurm["c"]
 
         if args.time is None and "time" in def_slurm:
