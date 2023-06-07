@@ -82,6 +82,7 @@ def get_arg_parser():
 
     # MULTIPROC OPTIONS
     parser.add_argument("--pt-proc", type=int, default=-1)
+    parser.add_argument("--rdzv-endpoint", type=str, default=None)
 
     # YAML LAUNCH OPTIONS
     parser.add_argument("--template", action="store_true")
@@ -436,6 +437,8 @@ def execute_command_file(run_cmd, args, proj_cfg):
 
     if args.pt_proc != -1:
         pt_dist_str = f"torchrun --nproc_per_node {args.pt_proc}"
+        if args.rdzv_endpoint is not None:
+            pt_dist_str += f" --rdzv-endpoint={args.rdzv_endpoint}"
 
         def make_dist_cmd(x):
             return x.replace("python", pt_dist_str)
