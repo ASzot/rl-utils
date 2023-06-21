@@ -1,6 +1,7 @@
 import argparse
 import os
 import os.path as osp
+import shlex
 import uuid
 from typing import Any, Callable, Dict, List, Optional
 
@@ -49,6 +50,7 @@ def eval_ckpt(
     proj_dat,
     modify_run_cmd_fn,
     args: argparse.Namespace,
+    rest,
 ):
     eval_sys_cfg = cfg.eval_sys
     # Find the run command.
@@ -127,7 +129,10 @@ def eval_ckpt(
         else:
             sep = eval_sys_cfg.sep
         new_cmd += f" {k}{sep}{v}"
+    if args.cd is not None:
+        new_cmd = f"CUDA_VISIBLE_DEVICES={args.cd} {new_cmd}"
     new_cmd = sub_in_vars(new_cmd, cfg, 0, "eval")
+    new_cmd += " " + shlex.join(rest)
 
     print("EVALUATING ", new_cmd)
     os.system(new_cmd)
@@ -145,11 +150,12 @@ def run(
     parser.add_argument("--proj-dat", default=None, type=str)
     parser.add_argument("--idx", default=None, type=int)
     parser.add_argument("--cmd", default=None, type=str)
+    parser.add_argument("--cd", default=None, type=str)
     parser.add_argument("--cfg", required=True, type=str)
     parser.add_argument("--debug", action="store_true")
     if add_args_fn is not None:
         add_args_fn(parser)
-    args = parser.parse_args()
+    args, rest = parser.parse_known_args()
 
     cfg = OmegaConf.load(args.cfg)
     eval_sys_cfg = cfg.eval_sys
@@ -180,6 +186,7 @@ def run(
             args.proj_dat,
             modify_run_cmd_fn,
             args,
+            rest,
         )
         if args.debug:
             break
