@@ -566,7 +566,7 @@ def generate_slurm_batch_file(
 
     cpu_options = "#SBATCH --cpus-per-task %i" % int(c)
     if args.speed:
-        cpu_options = "#SBATCH --overcommit\n"
+        cpu_options += "#SBATCH --overcommit\n"
         cpu_options += "#SBATCH --cpu-freq=performance\n"
 
     if has_python:

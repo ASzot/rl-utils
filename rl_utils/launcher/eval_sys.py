@@ -2,6 +2,7 @@ import argparse
 import os
 import os.path as osp
 import shlex
+import subprocess
 import uuid
 from typing import Any, Callable, Dict, List, Optional
 
@@ -139,6 +140,57 @@ def eval_ckpt(
     return True
 
 
+def get_ckpt_path_search(cfg, eval_sys_cfg, args, run_id) -> str:
+    full_path = osp.join(cfg.base_data_dir, eval_sys_cfg.ckpt_search_dir, run_id)
+    if eval_sys_cfg.search_cmd is None:
+        return ""
+    search_cmd = eval_sys_cfg.search_cmd.replace("$RUN_ID", run_id)
+
+    print(f"Searching with {search_cmd}")
+    process = subprocess.Popen(shlex.split(search_cmd), stdout=subprocess.PIPE)
+    (output, err) = process.communicate()
+    exit_code = process.wait()
+    output = output.decode("UTF-8").rstrip()
+
+    ckpt_idxs = [
+        int(f.split(".")[1]) for f in output.split("\n") if ".pth" in f and "ckpt" in f
+    ]
+
+    if args.idx is None:
+        last_idx = max(ckpt_idxs)
+    else:
+        last_idx = args.idx
+
+    ckpt_name = f"ckpt.{last_idx}.pth"
+    full_path = osp.join(full_path, ckpt_name)
+    download_cmd = (
+        eval_sys_cfg.download_cmd.replace("$RUN_ID", run_id)
+        .replace("$CKPT", ckpt_name)
+        .replace("$FULL_PATH", full_path)
+    )
+    print(f"Downloading with {download_cmd}")
+    os.system(download_cmd)
+
+    return full_path
+
+
+def get_ckpt_full_path(cfg, eval_sys_cfg, args, run_id) -> str:
+    full_path = osp.join(cfg.base_data_dir, eval_sys_cfg.ckpt_search_dir, run_id)
+    if not osp.exists(full_path) or args.force_search:
+        return get_ckpt_path_search(cfg, eval_sys_cfg, args, run_id)
+    ckpt_idxs = [
+        int(f.split(".")[1])
+        for f in os.listdir(full_path)
+        if ".pth" in f and "ckpt" in f
+    ]
+    if args.idx is None:
+        last_idx = max(ckpt_idxs)
+    else:
+        last_idx = args.idx
+
+    return osp.join(full_path, f"ckpt.{last_idx}.pth")
+
+
 def run(
     modify_run_cmd_fn: Optional[
         Callable[[List[str], str, argparse.Namespace], List[str]]
@@ -153,6 +205,11 @@ def run(
     parser.add_argument("--cd", default=None, type=str)
     parser.add_argument("--cfg", required=True, type=str)
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument(
+        "--force-search",
+        action="store_true",
+        help="If specified, will always search for the most recent checkpoint using the config `search_cmd`",
+    )
     if add_args_fn is not None:
         add_args_fn(parser)
     args, rest = parser.parse_known_args()
@@ -161,22 +218,10 @@ def run(
     eval_sys_cfg = cfg.eval_sys
     runs = args.runs.split(",")
     for run_id in runs:
-        full_path = osp.join(cfg.base_data_dir, eval_sys_cfg.ckpt_search_dir, run_id)
-
-        ckpt_idxs = [
-            int(f.split(".")[1])
-            for f in os.listdir(full_path)
-            if ".pth" in f and "ckpt" in f
-        ]
-        if args.idx is None:
-            last_idx = max(ckpt_idxs)
-        else:
-            last_idx = args.idx
-
-        full_path = osp.join(full_path, f"ckpt.{last_idx}.pth")
-
         rnd_id = str(uuid.uuid4())[:3]
         new_run_id = f"{run_id}_eval_{rnd_id}"
+
+        full_path = get_ckpt_full_path(cfg, eval_sys_cfg, args, run_id)
 
         eval_ckpt(
             run_id,
