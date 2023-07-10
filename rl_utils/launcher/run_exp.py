@@ -371,7 +371,16 @@ def yamlize_cmd(cmd, template_cfg, args, ident):
     if "prefix_cmd" in template_cfg:
         cmd = template_cfg.prefix_cmd + " " + cmd
     base_template["command"] = cmd
-    base_template["resources"]["num_gpus"] = int(args.g)
+    num_gpus = int(args.g)
+    gpu_ratio = template_cfg["max_num_gpus"] / num_gpus
+    base_template["resources"]["num_gpus"] = num_gpus
+    # Scale other resource use by the number of gpus.
+    base_template["resources"]["num_cpus"] = int(
+        base_template["resources"]["num_cpus"] // gpu_ratio
+    )
+    base_template["resources"]["memory_gb"] = int(
+        base_template["resources"]["memory_gb"] // gpu_ratio
+    )
     with open(path, "w") as f:
         yaml.dump(
             base_template,
