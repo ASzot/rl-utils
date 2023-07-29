@@ -208,7 +208,7 @@ def run(
     parser.add_argument(
         "--force-search",
         action="store_true",
-        help="If specified, will always search for the most recent checkpoint using the config `search_cmd`",
+        help="If specified, force search for the most recent checkpoint using the config `search_cmd`",
     )
     if add_args_fn is not None:
         add_args_fn(parser)
