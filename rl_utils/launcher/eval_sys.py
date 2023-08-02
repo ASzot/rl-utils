@@ -149,7 +149,7 @@ def get_ckpt_path_search(cfg, eval_sys_cfg, args, run_id) -> str:
     print(f"Searching with {search_cmd}")
     process = subprocess.Popen(shlex.split(search_cmd), stdout=subprocess.PIPE)
     (output, err) = process.communicate()
-    exit_code = process.wait()
+    process.wait()
     output = output.decode("UTF-8").rstrip()
 
     ckpt_idxs = [
