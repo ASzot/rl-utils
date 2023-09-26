@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="rl-exp-utils",
-    version="0.14",
+    version="0.16",
     author="Andrew Szot",
     author_email="andrewszot32@gmail.com",
     description="Library for RL research.",

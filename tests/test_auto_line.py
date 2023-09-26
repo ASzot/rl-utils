@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import pytest
 
 from rl_utils.plotting import line_plot
 from rl_utils.plotting.utils import fig_save
