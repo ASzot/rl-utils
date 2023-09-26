@@ -85,7 +85,13 @@ def get_arg_parser():
     parser.add_argument("--rdzv-endpoint", type=str, default=None)
 
     # YAML LAUNCH OPTIONS
-    parser.add_argument("--template", action="store_true")
+    parser.add_argument("--template", type=str, default=None)
+    parser.add_argument(
+        "--setup-command",
+        type=str,
+        default=None,
+        help="What to substitute for `setup_command`.",
+    )
     parser.add_argument("--secrets", type=str, default="")
 
     # SLURM OPTIONS
@@ -133,6 +139,15 @@ def get_arg_parser():
         default="7",
         help="""
             Number of cpus for SLURM job
+            """,
+    )
+    parser.add_argument(
+        "--num-nodes",
+        type=int,
+        default=1,
+        help="""
+            Number of nodes for the job. Currently only template runs support
+            this option.
             """,
     )
     parser.add_argument(
@@ -358,7 +373,8 @@ def sub_in_vars(cmd, proj_cfg, rank_i, group_id, override_base_data_dir=None):
 def yamlize_cmd(cmd, template_cfg, args, ident):
     for key, val in template_cfg["sub_paths"].items():
         cmd = cmd.replace(key, val)
-    with open(template_cfg.template, "r") as f:
+    template_path = template_cfg.templates[args.template]
+    with open(template_path, "r") as f:
         base_template = yaml.safe_load(f)
     path = osp.join(args.runs_dir, get_random_id() + ".yaml")
     secrets = args.secrets.split(",")
@@ -381,6 +397,10 @@ def yamlize_cmd(cmd, template_cfg, args, ident):
     base_template["resources"]["memory_gb"] = int(
         base_template["resources"]["memory_gb"] // gpu_ratio
     )
+    base_template["resources"]["num_nodes"] = args.num_nodes
+    if args.setup_command is not None:
+        base_template["setup_command"] = args.setup_command
+
     with open(path, "w") as f:
         yaml.dump(
             base_template,
@@ -462,7 +482,7 @@ def execute_command_file(run_cmd, args, proj_cfg):
         if not args.check:
             os.system(cmd)
 
-    if args.template:
+    if args.template is not None:
         template_cfg = proj_cfg["yaml_launch"]
         template_cmd = template_cfg["cmd"]
         for cmd_idx, cmd in enumerate(cmds):

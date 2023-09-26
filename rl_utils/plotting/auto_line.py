@@ -48,7 +48,7 @@ def make_steps_match(plot_df, group_key, x_name):
 
 
 def line_plot(
-    plot_df,
+    plot_df: pd.DataFrame,
     x_name: str,
     y_name: str,
     avg_key: str,
@@ -59,6 +59,7 @@ def line_plot(
     y_disp_bounds: Optional[Tuple[float, float]] = None,
     x_disp_bounds: Optional[Tuple[float, float]] = None,
     group_colors: Optional[Dict[str, int]] = None,
+    override_colors: Optional[Dict[str, Tuple[float, float, float, float]]] = None,
     xtick_fn=None,
     ytick_fn=None,
     legend: bool = False,
@@ -77,8 +78,24 @@ def line_plot(
     x_logscale=False,
     legend_loc: Optional[str] = None,
     ax_dims: Tuple[int, int] = (5, 4),
+    marker_size: int = 8,
+    marker_order: Optional[List[str]] = None,
 ):
     """
+    :param plot_df: The data to plot. The `avg_key`, `group_key`, `x_name`, and `y_name` all refer to columns in this dataframe. An example dataframe:
+        ```
+             method  steps  value  seed
+        0   method0      0   0.00     0
+        1   method0      1   0.25     0
+        2   method0      2   0.50     0
+        3   method0      3   0.75     0
+        4   method1      0   0.00     0
+        5   method1      1   0.50     0
+        ```
+        Where we might set `x_name=steps`, `y_name=value`, `avg_key=seed`,
+        `group_key=method`. This would produce two lines with no error shading.
+        To get the error shading you would need multiple seed values per
+        method.
     :param avg_key: This is typically the seed.
     :param group_key: These are the different lines.
     :param smooth_factor: Can specify a different smooth factor per method if desired.
@@ -90,6 +107,9 @@ def line_plot(
         drawn on the line, NOT the number of points that are plotted! By
         default this is 8.
     :param legend: Whether to include a legend within the plot.
+    :param marker_order: The marker symbols to use.
+    :param marker_size: The size of the markers.
+    :param override_colors: Override the color of a group to a certain color.
 
     :returns: The plotted figure.
     """
@@ -109,11 +129,15 @@ def line_plot(
     plot_df = plot_df.copy()
     if tight:
         plt.tight_layout(pad=2.2)
-    if group_colors is None:
-        group_colors = method_idxs
 
-    colors = sns.color_palette()
-    group_colors = {k: colors[i] for k, i in group_colors.items()}
+    if override_colors is None:
+        if group_colors is None:
+            group_colors = method_idxs
+
+        colors = sns.color_palette()
+        group_colors = {k: colors[i] for k, i in group_colors.items()}
+    else:
+        group_colors = override_colors
 
     avg_y_df = plot_df.groupby([group_key, x_name]).mean()
     std_y_df = plot_df.groupby([group_key, x_name]).std()
@@ -161,6 +185,8 @@ def line_plot(
     for name, sub_df in avg_y_df.groupby(level=0):
         names.append(name)
         x_vals = sub_df.index.get_level_values(x_name).to_numpy()
+        if x_vals.dtype == object:
+            x_vals = np.array([rename_map.get(x, x) for x in x_vals])
         y_vals = sub_df[y_name].to_numpy()
 
         if x_disp_bounds is not None:
@@ -189,14 +215,16 @@ def line_plot(
             int(x)
             for x in np.linspace(0, len(x_vals) - 1, num=num_marker_points.get(name, 8))
         ]
-        midx = method_idxs[name] % len(MARKER_ORDER)
+        if marker_order is None:
+            marker_order = MARKER_ORDER
+        midx = method_idxs[name] % len(marker_order)
         ladd = ax.plot(
             x_vals[sel_vals],
             y_vals[sel_vals],
-            MARKER_ORDER[midx],
+            marker_order[midx],
             label=rename_map.get(name, name),
             color=group_colors[name],
-            markersize=8,
+            markersize=marker_size,
         )
 
         lines.append((ladd[0], line_to_add[0]))
@@ -236,7 +264,7 @@ def line_plot(
             **kwargs,
         )
 
-    ax.grid(b=True, which="major", color="lightgray", linestyle="--")
+    ax.grid(which="major", color="lightgray", linestyle="--")
 
     ax.set_xlabel(rename_map.get(x_name, x_name), fontsize=axes_font_size)
     ax.set_ylabel(rename_map.get(y_name, y_name), fontsize=axes_font_size)

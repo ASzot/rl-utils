@@ -29,11 +29,14 @@ def plot_table(
     write_to=None,
     err_key: Optional[str] = None,
     add_tabular: bool = True,
+    add_botrule: bool = False,
     bold_row_names: bool = True,
     show_row_labels: bool = True,
     show_col_labels: bool = True,
     compute_err_fn: Optional[Callable[[pd.Series], pd.Series]] = None,
     value_scaling: float = 1.0,
+    midrule_formatting: str = "\\midrule\n",
+    botrule_formatting: str = "\\bottomrule",
     custom_cell_format_fn: Optional[
         Callable[
             [
@@ -184,8 +187,8 @@ def plot_table(
         row_lines = all_s[1:]
         start_of_line = ""
         toprule = "\\toprule\n"
-        midrule = "\\midrule\n"
-        botrule = "\\bottomrule"
+        midrule = midrule_formatting
+        botrule = botrule_formatting
 
     if skip_toprule:
         toprule = ""
@@ -220,6 +223,9 @@ def plot_table(
         ret_s += botrule
 
         ret_s += "\n\\end{tabular}\n"
+
+    if add_botrule:
+        ret_s += botrule
 
     if write_to is not None:
         with open(write_to, "w") as f:

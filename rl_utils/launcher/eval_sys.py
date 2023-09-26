@@ -185,6 +185,9 @@ def get_ckpt_full_path(cfg, eval_sys_cfg, args, run_id) -> str:
     ]
     if args.idx is None:
         last_idx = max(ckpt_idxs)
+    elif args.idx == -1:
+        # Evaluate everything in the directory.
+        return full_path
     else:
         last_idx = args.idx
 
@@ -200,7 +203,12 @@ def run(
     parser = argparse.ArgumentParser()
     parser.add_argument("--runs", default=None, type=str)
     parser.add_argument("--proj-dat", default=None, type=str)
-    parser.add_argument("--idx", default=None, type=int)
+    parser.add_argument(
+        "--idx",
+        default=None,
+        type=int,
+        help="If not specified, will evaluate the last checkpoint in the folder. If specified, this will evaluate the desired checkpoint index. If set to -1, this will evaluate all checkpoints in the folder.",
+    )
     parser.add_argument("--cmd", default=None, type=str)
     parser.add_argument("--cd", default=None, type=str)
     parser.add_argument("--cfg", required=True, type=str)
