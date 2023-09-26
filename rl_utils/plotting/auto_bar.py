@@ -1,5 +1,5 @@
 import argparse
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,6 +19,7 @@ def plot_bar(
     group_key: str,
     plot_key: str,
     name_ordering: Optional[str] = None,
+    group_name_ordering: Optional[List[str]] = None,
     name_colors=None,
     rename_map: Optional[Dict[str, str]] = None,
     show_ticks: bool = True,
@@ -41,10 +42,15 @@ def plot_bar(
     xlabel: Optional[str] = None,
     xlabel_rot: int = 30,
     include_err: bool = True,
+    include_grid: bool = False,
+    bar_edge_thickness: float = 0.0,
+    legend_n_cols: int = 1,
+    xaxis_label_colors: Optional[Dict[str, Tuple[float, float, float]]] = None,
 ):
     """
     :param group_key: The key to take the average/std over. Likely the method key.
-    :param name_ordering: Order of the names on the x-axis.
+    :param name_ordering: Order of the group names on the x-axis.
+    :param group_name_ordering: Order of the bars within a group.
     :param bar_pad: Distance between bar groups
     :param within_group_padding: Distance between bars within bar group.
     :param bar_group_key: Group columns next to each other.
@@ -53,16 +59,23 @@ def plot_bar(
         [0,1]). Overrides `name_colors`.
     :param xlabel_rot: The rotation (in degrees) of the labels on the x-axis.
     :param include_err: Whether to include error bars.
+    :param include_grid: Whether to render a background grid behind the bars.
+    :param bar_edge_thickness: How thick the border edges of each bar are.
+    :param legend_n_cols: Number of columns in the legend (if it is displayed).
+    :param xaxis_label_colors: Specifies the colors of the x-axis labels. Maps
+        from the original x-axis group name, not the renamed version.
     """
 
     def_idx = [(k, i) for i, k in enumerate(plot_df[group_key].unique())]
     if name_ordering is None:
         name_ordering = [x for x, _ in def_idx]
     colors = sns.color_palette()
-    if name_colors is None:
+    if name_colors is None and group_colors is None:
         name_colors = {k: colors[v] for k, v in def_idx}
     if rename_map is None:
         rename_map = {}
+    if xaxis_label_colors is None:
+        xaxis_label_colors = {}
 
     plot_df = plot_df.replace("missing", missing_fill_value)
     plot_df = plot_df.replace("error", error_fill_value)
@@ -75,30 +88,39 @@ def plot_bar(
     start_x = 0.0
     within_group_spacing = bar_width + within_group_padding
 
+    grouped_bar_data = {k: v for k, v in bar_grouped}
+
+    if group_name_ordering is None:
+        group_name_ordering = list(grouped_bar_data.keys())
+
     fig, ax = plt.subplots()
-    for bar_group_name, sub_df in bar_grouped:
-        df_avg_y = sub_df.groupby(group_key).mean()
-        df_std_y = sub_df.groupby(group_key).std()
+    all_use_x = []
+    for bar_group_name in group_name_ordering:
+        sub_df = grouped_bar_data[bar_group_name]
+        df_avg_y = sub_df.groupby(group_key)[plot_key].mean()
+        df_std_y = sub_df.groupby(group_key)[plot_key].std()
 
         avg_y = []
         std_y = []
-        name_ordering = [n for n in name_ordering if n in df_avg_y.index]
+        group_name_ordering = [n for n in name_ordering if n in df_avg_y.index]
         is_missing = []
         is_error = []
-        for name in name_ordering:
-            is_missing.append(df_avg_y[plot_key].loc[name] == missing_fill_value)
-            is_error.append(df_avg_y[plot_key].loc[name] == error_fill_value)
-            avg_y.append(df_avg_y.loc[name][plot_key])
-            std_y.append(df_std_y.loc[name][plot_key] * error_scaling)
+        for name in group_name_ordering:
+            is_missing.append(df_avg_y.loc[name] == missing_fill_value)
+            is_error.append(df_avg_y.loc[name] == error_fill_value)
+            avg_y.append(df_avg_y.loc[name])
+            std_y.append(df_std_y.loc[name] * error_scaling)
         if group_colors is None:
-            colors = [name_colors[x] for x in name_ordering]
+            colors = [name_colors[x] for x in group_name_ordering]
         else:
-            colors = [group_colors[bar_group_name] for _ in name_ordering]
+            colors = [group_colors[bar_group_name] for _ in group_name_ordering]
 
         N = len(avg_y)
         end_x = round(start_x + N * (bar_width + bar_pad), 3)
 
         use_x = np.linspace(start_x, end_x, N)
+        all_use_x.append(use_x)
+
         kwargs = {}
         if include_err:
             std_y = np.nan_to_num(std_y, nan=0.0)
@@ -113,6 +135,7 @@ def plot_bar(
                 },
             }
 
+        use_name = rename_map.get(bar_group_name, bar_group_name)
         bars = ax.bar(
             use_x,
             avg_y,
@@ -121,7 +144,8 @@ def plot_bar(
             align="center",
             alpha=bar_alpha,
             edgecolor=(0, 0, 0, 1.0),
-            label=rename_map.get(bar_group_name, bar_group_name),
+            linewidth=bar_edge_thickness,
+            label=use_name,
             **kwargs,
         )
         start_x += within_group_spacing
@@ -142,7 +166,10 @@ def plot_bar(
     else:
         xtic_names = ["" for x in name_ordering]
 
-    xtic_locs = use_x
+    xtic_locs = all_use_x[len(all_use_x) // 2]
+    if include_grid:
+        ax.grid(which="major", color="lightgray", linestyle="-", axis="y", zorder=-100)
+    ax.set(axisbelow=True)
     ax.set_xticks(xtic_locs)
     ax.set_xticklabels(xtic_names, rotation=xlabel_rot, fontsize=tic_font_size)
     ax.set_ylabel(rename_map.get(plot_key, plot_key), fontsize=axis_font_size)
@@ -153,9 +180,23 @@ def plot_bar(
     if title != "":
         ax.set_title(title)
     if legend:
-        ax.legend(fontsize=legend_font_size)
+        ax.legend(
+            fontsize=legend_font_size,
+            ncol=legend_n_cols,
+        )
     for lab in ax.get_yticklabels():
         lab.set_fontsize(tic_font_size)
+
+    x_axis = ax.xaxis
+    new_name_to_orig = {v: k for k, v in rename_map.items()}
+    for label in x_axis.get_ticklabels():
+        new_name = label.get_text()
+        orig_name = new_name_to_orig.get(new_name, new_name)
+        if orig_name in xaxis_label_colors:
+            color = np.array(xaxis_label_colors[orig_name], dtype=np.float32)
+            if sum(color) > 3:
+                color /= 255.0
+            label.set_color(color)
     return fig
 
 

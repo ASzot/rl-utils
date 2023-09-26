@@ -96,8 +96,10 @@ def query(
     wb_proj_name = proj_cfg["proj_name"]
     wb_entity = proj_cfg["wb_entity"]
 
-    lookup = f"{select_fields}_{filter_fields}"
-    cache = CacheHelper("wb_queries", lookup)
+    cache_name = f"wb_queries_{select_fields}_{filter_fields}"
+    for bad_char in ["'", " ", "/", "[", "(", ")", "]"]:
+        cache_name = cache_name.replace(bad_char, "")
+    cache = CacheHelper(cache_name)
 
     if use_cached and cache.exists():
         return cache.load()
@@ -139,7 +141,6 @@ def query(
         for f in select_fields:
             v = None
             if f == "last_model":
-
                 parts = proj_cfg["ckpt_cfg_key"].split(".")
                 model_path = run.config
                 for k in parts:
@@ -221,7 +222,6 @@ def query_s(
     verbose=True,
     use_cached: bool = False,
 ):
-
     select_s, filter_s = query_str.split(" WHERE ")
     select_fields = select_s.replace(" ", "").split(",")
 
