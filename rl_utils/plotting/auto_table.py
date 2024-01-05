@@ -1,6 +1,7 @@
 import argparse
 from typing import Callable, Dict, List, Optional
 
+import numpy as np
 import pandas as pd
 from omegaconf import OmegaConf
 
@@ -20,7 +21,7 @@ def plot_table(
     n_decimals=2,
     missing_fill_value=MISSING_VALUE,
     error_fill_value=0.3444,
-    get_row_highlight: Optional[Callable[[str, pd.DataFrame], Optional[str]]] = None,
+    get_row_highlights: Optional[Callable[[str, pd.DataFrame], Optional[str]]] = None,
     make_col_header: Optional[Callable[[int], str]] = None,
     x_label: str = "",
     y_label: str = "",
@@ -138,10 +139,10 @@ def plot_table(
 
         row_y, row_std = rows[row_k]
 
-        if get_row_highlight is not None:
-            sel_col = get_row_highlight(row_k, row_y)
+        if get_row_highlights is not None:
+            sel_cols = get_row_highlights(row_k, row_y)
         else:
-            sel_col = None
+            sel_cols = None
         for col_k in col_order:
             if col_k not in row_y:
                 row_str.append("-")
@@ -155,12 +156,12 @@ def plot_table(
                 else:
                     if custom_cell_format_fn is None:
                         err = ""
-                        if include_err:
+                        if include_err and not np.isnan(std):
                             err = f"$ \\pm$ %.{n_decimals}f " % std
                             err = f"{{\\scriptsize {err} }}"
                         txt = f" %.{n_decimals}f {err}" % val
 
-                        if col_k == sel_col:
+                        if sel_cols is not None and col_k in sel_cols:
                             txt = "\\textbf{ " + txt + " }"
                     else:
                         txt = custom_cell_format_fn(val, err)
@@ -208,8 +209,11 @@ def plot_table(
         ret_s += midrule
 
     all_row_s = ""
-    for row_line in row_lines:
+    for i, row_line in enumerate(row_lines):
         all_row_s += row_line
+        if i == len(row_lines) - 1 and not add_botrule:
+            # If we don't add anything at the bottom, we shouldn't add any separator.
+            continue
 
         # Do not add the separator to the last element if we are not in tabular mode.
         if "hline" not in row_line:

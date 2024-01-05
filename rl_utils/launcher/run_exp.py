@@ -340,9 +340,19 @@ def split_cmd(cmd):
     return [" ".join(ret_cmd) for ret_cmd in ret_cmds]
 
 
+def preserve_qoutes(x: str) -> str:
+    """
+    Preserves the quotations in the strings. Otherwise shlex split will ignore
+    them.
+    """
+
+    return x.replace("='", '="DELIM').replace("'", "'" + '"').replace("DELIM", "'")
+
+
 def sub_in_args(old_cmd: str, new_args: str):
-    old_parts = shlex.split(old_cmd, posix=False)
-    new_parts = shlex.split(new_args, posix=False)
+    old_parts = shlex.split(old_cmd, posix=True)
+    new_args = preserve_qoutes(new_args)
+    new_parts = shlex.split(new_args, posix=True)
 
     i = 0
     while i < len(new_parts):

@@ -31,10 +31,10 @@ def smooth_arr(scalars: List[float], weight: float) -> List[float]:
     return smoothed
 
 
-def make_steps_match(plot_df, group_key, x_name):
+def make_steps_match(plot_df, seed_k, x_name, method_k):
     all_dfs = []
-    for _, method_df in plot_df.groupby([group_key]):
-        grouped_runs = method_df.groupby(["run"])
+    for _, method_df in plot_df.groupby([method_k]):
+        grouped_runs = method_df.groupby([seed_k])
         max_len = -1
         max_step_idxs = None
         for _, run_df in grouped_runs:
@@ -80,6 +80,9 @@ def line_plot(
     ax_dims: Tuple[int, int] = (5, 4),
     marker_size: int = 8,
     marker_order: Optional[List[str]] = None,
+    subsample_factor: Optional[int] = None,
+    n_drop_last_points: Optional[int] = None,
+    n_drop_first_points: Optional[int] = None,
 ):
     """
     :param plot_df: The data to plot. The `avg_key`, `group_key`, `x_name`, and `y_name` all refer to columns in this dataframe. An example dataframe:
@@ -101,7 +104,8 @@ def line_plot(
     :param smooth_factor: Can specify a different smooth factor per method if desired.
     :param y_bounds: What the data plot values are clipped to.
     :param y_disp_bounds: What the plotting is stopped at.
-    :param ax: If not specified, one is automatically created, with the specified dimensions under `ax_dims`
+    :param ax: If not specified, one is automatically created, with the
+        specified dimensions under `ax_dims`
     :param group_colors: If not specified defaults to `method_idxs`.
     :param num_marker_points: Key maps method name to the number of markers
         drawn on the line, NOT the number of points that are plotted! By
@@ -110,6 +114,13 @@ def line_plot(
     :param marker_order: The marker symbols to use.
     :param marker_size: The size of the markers.
     :param override_colors: Override the color of a group to a certain color.
+    :param subsample_factor: How much to sub-sample the number of points to
+        plot by. Larger value means fewer plotted points.
+    :param n_drop_last_points: Sometimes there can be a weird up-tick or
+        down-tick artifact from the smoothing. Setting this to 1 typically fixes
+        that.
+    :param n_drop_first_points: Removes this number of points from the start of
+        the line.
 
     :returns: The plotted figure.
     """
@@ -202,10 +213,24 @@ def line_plot(
         )
         y_std = sub_df["std"].fillna(0).to_numpy()
 
+        if subsample_factor is not None:
+            y_std = y_std[::subsample_factor]
+            y_vals = y_vals[::subsample_factor]
+            x_vals = x_vals[::subsample_factor]
+
         use_smooth_factor = smooth_factor_lookup[name]
         if use_smooth_factor != 0.0:
             y_vals = np.array(smooth_arr(y_vals, use_smooth_factor))
             y_std = np.array(smooth_arr(y_std, use_smooth_factor))
+
+        if n_drop_last_points is not None:
+            y_vals = y_vals[:-n_drop_last_points]
+            x_vals = x_vals[:-n_drop_last_points]
+            y_std = y_std[:-n_drop_last_points]
+        if n_drop_first_points is not None:
+            y_vals = y_vals[n_drop_first_points:]
+            x_vals = x_vals[n_drop_first_points:]
+            y_std = y_std[n_drop_first_points:]
 
         add_kwargs = {}
         if name in line_styles:
