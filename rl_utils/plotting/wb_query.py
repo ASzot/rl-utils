@@ -12,7 +12,6 @@ from typing import Any, Callable, Dict, List, Optional
 import numpy as np
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
-
 from rl_utils.common.core_utils import CacheHelper
 from rl_utils.plotting.utils import MISSING_VALUE
 
@@ -34,6 +33,7 @@ def batch_query(
     use_cached=False,
     reduce_op: Optional[Callable[[List], float]] = None,
     error_ok: bool = False,
+    timeout=None,
 ):
     """
     - all_should_skip: Whether to skip querying this value.
@@ -59,6 +59,7 @@ def batch_query(
                 use_cached,
                 reduce_op,
                 error_ok=error_ok,
+                timeout=timeout,
             )
         if len(r) == 0:
             r = [{k: MISSING_VALUE for k in select_fields}]
@@ -79,6 +80,7 @@ def query(
     use_cached=False,
     reduce_op: Optional[Callable[[List], float]] = None,
     error_ok: bool = False,
+    timeout=None,
 ):
     """
     :param select_fields: The list of data to retrieve. If a field starts with
@@ -106,7 +108,10 @@ def query(
     if wandb is None:
         raise ValueError("Wandb is not installed")
 
-    api = wandb.Api()
+    kwargs = {}
+    if timeout is not None:
+        kwargs["timeout"] = timeout
+    api = wandb.Api(**kwargs)
 
     query_dict = {}
     search_id = None

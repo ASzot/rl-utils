@@ -1,12 +1,12 @@
 import argparse
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from matplotlib.ticker import AutoMinorLocator
 from omegaconf import OmegaConf
-
 from rl_utils.plotting.utils import fig_save
 from rl_utils.plotting.wb_query import batch_query
 
@@ -33,7 +33,10 @@ def plot_bar(
     error_fill_value: float = ERROR_VAL,
     bar_group_key: Optional[str] = None,
     base_bar_width: float = 0.35,
-    bar_darkness: float = 0.2,
+    error_bar_color: Union[str, Tuple[float, float, float, float]] = "black",
+    error_lw=2,
+    error_capsize=3,
+    error_capthick=2,
     bar_alpha: float = 0.9,
     bar_pad: float = 0.2,
     within_group_padding: float = 0.01,
@@ -45,6 +48,7 @@ def plot_bar(
     include_grid: bool = False,
     bar_edge_thickness: float = 0.0,
     legend_n_cols: int = 1,
+    minor_tick_count: Optional[int] = None,
     xaxis_label_colors: Optional[Dict[str, Tuple[float, float, float]]] = None,
 ):
     """
@@ -64,6 +68,10 @@ def plot_bar(
     :param legend_n_cols: Number of columns in the legend (if it is displayed).
     :param xaxis_label_colors: Specifies the colors of the x-axis labels. Maps
         from the original x-axis group name, not the renamed version.
+    :param minor_tick_count: If set, will create this many minor ticks between
+        each major tick, these ticks will automatically be colored in as well.
+    :param error_bar_color: Color of the error bar. Either a named color or a
+        tuple like (0.2, 0.2, 0.2, 1.0) specifying RGBA.
     """
 
     def_idx = [(k, i) for i, k in enumerate(plot_df[group_key].unique())]
@@ -128,10 +136,10 @@ def plot_bar(
             kwargs = {
                 "yerr": std_y,
                 "error_kw": {
-                    "ecolor": (bar_darkness, bar_darkness, bar_darkness, 1.0),
-                    "lw": 2,
-                    "capsize": 3,
-                    "capthick": 2,
+                    "ecolor": error_bar_color,
+                    "lw": error_lw,
+                    "capsize": error_capsize,
+                    "capthick": error_capthick,
                 },
             }
 
@@ -168,7 +176,7 @@ def plot_bar(
 
     xtic_locs = all_use_x[len(all_use_x) // 2]
     if include_grid:
-        ax.grid(which="major", color="lightgray", linestyle="-", axis="y", zorder=-100)
+        ax.grid(which="both", color="lightgray", linestyle="-", axis="y", zorder=-100)
     ax.set(axisbelow=True)
     ax.set_xticks(xtic_locs)
     ax.set_xticklabels(xtic_names, rotation=xlabel_rot, fontsize=tic_font_size)
@@ -184,6 +192,9 @@ def plot_bar(
             fontsize=legend_font_size,
             ncol=legend_n_cols,
         )
+
+    if minor_tick_count is not None:
+        ax.yaxis.set_minor_locator(AutoMinorLocator(minor_tick_count))
     for lab in ax.get_yticklabels():
         lab.set_fontsize(tic_font_size)
 
