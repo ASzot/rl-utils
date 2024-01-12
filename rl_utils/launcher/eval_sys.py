@@ -8,39 +8,11 @@ from typing import Any, Callable, Dict, List, Optional
 
 from omegaconf import OmegaConf
 
+from rl_utils.common.core_utils import logger
 from rl_utils.launcher.run_exp import get_random_id, sub_in_args, sub_in_vars
+from rl_utils.plotting.wb_query import get_run_command
 
 RUN_DIR = "data/log/runs/"
-
-
-def change_arg_vals(cmd_parts: List[str], new_arg_values: Dict[str, Any]) -> List[str]:
-    """
-    If the argument value does not exist, it will be added.
-    :param new_arg_values: If the value is a function, it will take as input
-        the current argument value and return the new argument value.
-    """
-    did_find = {k: False for k in new_arg_values.keys()}
-    for i in range(len(cmd_parts) - 1):
-        if cmd_parts[i] in new_arg_values:
-            replace_val = new_arg_values[cmd_parts[i]]
-            if isinstance(replace_val, Callable):
-                cmd_parts[i + 1] = replace_val(cmd_parts[i + 1])
-            else:
-                cmd_parts[i + 1] = replace_val
-            did_find[cmd_parts[i]] = True
-    all_not_found_k = [k for k, did_find in did_find.items() if not did_find]
-    for not_found_k in all_not_found_k:
-        new_val = new_arg_values[not_found_k]
-        if isinstance(new_val, Callable):
-            new_val = new_val("")
-
-        cmd_parts.extend([not_found_k, new_val])
-
-    return cmd_parts
-
-
-def split_cmd_txt(cmd):
-    return [y for x in cmd.split(" ") for y in x.split("=")]
 
 
 def eval_ckpt(
@@ -57,19 +29,23 @@ def eval_ckpt(
     # Find the run command.
     run_path = osp.join(RUN_DIR, run_id + ".sh")
     if osp.exists(run_path):
-        print("Substituting slurm run command.")
+        logger.info("Substituting slurm run command.")
         # Get the actually executed command.
         with open(run_path, "r") as f:
             cmd = f.readlines()[-1]
         cmd_parts = split_cmd_txt(cmd)
     else:
-        print("Substituting in the run command.")
+        logger.info("Substituting in the run command.")
         if args.cmd is None:
-            cmd = eval_sys_cfg.eval_run_cmd
+            cmd = get_run_command(
+                run_id, eval_sys_cfg.wandb_run_name_k, cfg.wb_entity, cfg.proj_name
+            )
         else:
             cmd = eval_sys_cfg.eval_run_cmd[args.cmd]
         add_all = cfg.get("add_all", None)
-        if add_all is not None:
+        if add_all is not None and args.cmd is not None:
+            # If `args.cmd` is None, then we used the old command which already
+            # has the `add_all` content included.
             cmd = sub_in_args(cmd, add_all)
         cmd = sub_in_vars(cmd, cfg, 0, "eval")
         ident = get_random_id()
@@ -79,17 +55,7 @@ def eval_ckpt(
         # Dummy line for srun
         cmd_parts.insert(0, "")
 
-    def add_eval_suffix(x):
-        x = x.strip()
-        if x == "":
-            return get_random_id() + "_eval"
-        elif "." in x:
-            parts = x.split(".")
-            return parts[0] + "_eval." + parts[1]
-        elif x[-1] == "/":
-            return x[:-1] + "_eval/"
-        else:
-            return x + "_eval"
+    cmd_parts = sub_in_eval_type(cmd_parts, args, eval_sys_cfg)
 
     cmd_parts = change_arg_vals(
         cmd_parts,
@@ -135,7 +101,7 @@ def eval_ckpt(
     new_cmd = sub_in_vars(new_cmd, cfg, 0, "eval")
     new_cmd += " " + shlex.join(rest)
 
-    print("EVALUATING ", new_cmd)
+    logger.info(f"EVALUATING {new_cmd}")
     os.system(new_cmd)
     return True
 
@@ -146,7 +112,7 @@ def get_ckpt_path_search(cfg, eval_sys_cfg, args, run_id) -> str:
         return ""
     search_cmd = eval_sys_cfg.search_cmd.replace("$RUN_ID", run_id)
 
-    print(f"Searching with {search_cmd}")
+    logger.info(f"Searching with {search_cmd}")
     process = subprocess.Popen(shlex.split(search_cmd), stdout=subprocess.PIPE)
     (output, err) = process.communicate()
     process.wait()
@@ -168,7 +134,7 @@ def get_ckpt_path_search(cfg, eval_sys_cfg, args, run_id) -> str:
         .replace("$CKPT", ckpt_name)
         .replace("$FULL_PATH", full_path)
     )
-    print(f"Downloading with {download_cmd}")
+    logger.info(f"Downloading with {download_cmd}")
     os.system(download_cmd)
 
     return full_path
@@ -194,6 +160,75 @@ def get_ckpt_full_path(cfg, eval_sys_cfg, args, run_id) -> str:
     return osp.join(full_path, f"ckpt.{last_idx}.pth")
 
 
+def add_eval_suffix(x):
+    x = x.strip()
+    if x == "":
+        return get_random_id() + "_eval"
+    elif "." in x:
+        parts = x.split(".")
+        return parts[0] + "_eval." + parts[1]
+    elif x[-1] == "/":
+        return x[:-1] + "_eval/"
+    else:
+        return x + "_eval"
+
+
+def change_arg_vals(cmd_parts: List[str], new_arg_values: Dict[str, Any]) -> List[str]:
+    """
+    If the argument value does not exist, it will be added.
+    :param new_arg_values: If the value is a function, it will take as input
+        the current argument value and return the new argument value.
+    """
+    did_find = {k: False for k in new_arg_values.keys()}
+    for i in range(len(cmd_parts) - 1):
+        if cmd_parts[i] in new_arg_values:
+            replace_val = new_arg_values[cmd_parts[i]]
+            if isinstance(replace_val, Callable):
+                cmd_parts[i + 1] = replace_val(cmd_parts[i + 1])
+            else:
+                cmd_parts[i + 1] = replace_val
+            did_find[cmd_parts[i]] = True
+    all_not_found_k = [k for k, did_find in did_find.items() if not did_find]
+    for not_found_k in all_not_found_k:
+        new_val = new_arg_values[not_found_k]
+        if isinstance(new_val, Callable):
+            new_val = new_val("")
+
+        cmd_parts.extend([not_found_k, new_val])
+
+    return cmd_parts
+
+
+def split_cmd_txt(cmd: str) -> List[str]:
+    cmd = cmd.replace("='", '="DELIM').replace("'", "'" + '"').replace("DELIM", "'")
+    [y for x in cmd.split(" ") for y in x.split("=")]
+    return [y for x in shlex.split(cmd, posix=True) for y in x.split("=")]
+
+
+def sub_in_eval_type(cmd_parts: List[str], args, eval_sys_cfg) -> List[str]:
+    if args.eval is None:
+        return cmd_parts
+
+    eval_type = None
+    for i in range(len(cmd_parts) - 1):
+        if cmd_parts[i] != eval_sys_cfg.eval_type_lookup_k:
+            continue
+        # Specified as the argument value.
+        eval_type = cmd_parts[i + 1]
+
+    if eval_type is None:
+        raise ValueError(
+            f"Could not find eval type lookup key {eval_sys_cfg.eval_type_lookup_k}"
+        )
+    eval_types = eval_sys_cfg.eval_types[args.eval]
+    add_args = eval_types[eval_type]
+    logger.info(f"Adding eval arguments for {eval_type}: {add_args}")
+    return change_arg_vals(
+        cmd_parts,
+        add_args,
+    )
+
+
 def run(
     modify_run_cmd_fn: Optional[
         Callable[[List[str], str, argparse.Namespace], List[str]]
@@ -210,6 +245,12 @@ def run(
         help="If not specified, will evaluate the last checkpoint in the folder. If specified, this will evaluate the desired checkpoint index. If set to -1, this will evaluate all checkpoints in the folder.",
     )
     parser.add_argument("--cmd", default=None, type=str)
+    parser.add_argument(
+        "--eval",
+        default=None,
+        type=str,
+        help="The evaluation mode. Useful to have different evaluation setups for train and test splits. If specified, this will add additional arguments based on the value of `eval_cfg.eval_type_lookup_k` and the specified arguments in `eval_cfg.eval_types`.",
+    )
     parser.add_argument("--cd", default=None, type=str)
     parser.add_argument("--cfg", required=True, type=str)
     parser.add_argument("--debug", action="store_true")

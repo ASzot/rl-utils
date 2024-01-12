@@ -2,6 +2,7 @@
 Helpers for dealing with vectorized environments.
 """
 
+import logging
 import os
 import os.path as osp
 import pickle
@@ -14,6 +15,18 @@ import gym
 import gym.spaces as spaces
 import numpy as np
 import torch
+
+logger = logging.getLogger("rl_utils")
+logger.propagate = False
+ch = logging.StreamHandler()
+ch.setFormatter(
+    logging.Formatter(
+        "%(name)s-%(levelname)s-%(asctime)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+)
+logger.addHandler(ch)
+logger.setLevel(logging.INFO)
 
 
 def set_seed(seed: int) -> None:
@@ -219,7 +232,7 @@ class StackHelper:
             self.stacked_obs[:, : -self.input_dim] = self.stacked_obs[
                 :, self.input_dim :
             ].clone()
-            for (i, new) in enumerate(dones):
+            for i, new in enumerate(dones):
                 if new:
                     self.stacked_obs[i] = 0
             self.stacked_obs[:, -self.input_dim :] = obs

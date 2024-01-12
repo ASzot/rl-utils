@@ -282,6 +282,37 @@ def fetch_data_from_cfg(
     return pd.DataFrame(result)
 
 
+def _fix_argument_quotes(x):
+    name, val = x.split("=")
+    if " " in val:
+        val = f"'{val}'"
+    return f"{name}={val}"
+
+
+def get_run_command(run_name, wb_run_name_k, wb_entity, proj_name) -> str:
+    """
+    Retrieves the Python command for WB run with name `run_name` where the name
+    is specified by the config property `wb_run_name_k`.
+    """
+
+    if wandb is None:
+        raise ValueError("Wandb is not installed. Cannot search for run command")
+    api = wandb.Api()
+    runs = api.runs(
+        path=wb_entity + "/" + proj_name,
+        filters={
+            "config." + wb_run_name_k: run_name,
+        },
+    )
+    runs = list(runs)
+    if len(runs) != 1:
+        raise ValueError(f"Got more than 1 matching run {runs}")
+    metadata = runs[0].metadata
+    cmd_args = map(_fix_argument_quotes, metadata["args"])
+    cmd_args = " ".join(cmd_args)
+    return f"{metadata['executable']} {metadata['program']} {cmd_args}"
+
+
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--cfg", required=True, type=str)
