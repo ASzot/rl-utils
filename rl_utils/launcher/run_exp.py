@@ -350,7 +350,7 @@ def safe_split(x: str) -> str:
     return shlex.split(x, posix=True)
 
 
-def sub_in_args(old_cmd: str, new_args: str):
+def sub_in_args(old_cmd: str, new_args: str) -> str:
     old_parts = safe_split(old_cmd)
     new_parts = safe_split(new_args)
 
@@ -358,10 +358,12 @@ def sub_in_args(old_cmd: str, new_args: str):
     while i < len(new_parts):
         if new_parts[i] in old_parts:
             old_i = old_parts.index(new_parts[i])
-            old_parts[old_i + 1] = new_parts[i + 1]
+
+            old_parts[old_i] = new_parts[i]
         else:
             old_parts.extend(new_parts[i : i + 2])
         i += 2
+
     return " ".join(old_parts)
 
 

@@ -53,6 +53,8 @@ def plot_table(
     :param col_key: A string from the set of columns.
     :param row_key: A string from the set of columns (but this is used to form the rows of the table).
     :param renames: Only used for display name conversions. Does not affect functionality.
+    :param row_order: Order of the rows to display. If the value in the row
+        order is hline, then a horizontal break is inserted.
     :param make_col_header: Returns the string at the top of the table like
         "ccccc". Put "c|ccccc" to insert a vertical line in between the first
         and other columns.

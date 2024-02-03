@@ -291,7 +291,7 @@ class CacheHelper:
     def __init__(self, cache_name, def_val=None, verbose=False, rel_dir=""):
         self.use_cache_path = osp.join(CacheHelper.CACHE_PATH, rel_dir)
         os.makedirs(self.use_cache_path, exist_ok=True)
-        self.cache_id = osp.join(self.use_cache_path, f"{cache_name}.pickle")
+        self.cache_id = osp.join(self.use_cache_path, f"{hash(cache_name)}.pickle")
         self.def_val = def_val
         self.verbose = verbose
 

@@ -56,6 +56,7 @@ def line_plot(
     smooth_factor: Union[Dict[str, float], float] = 0.0,
     ax: Optional[matplotlib.axes.Axes] = None,
     y_bounds: Optional[Tuple[float, float]] = None,
+    x_bounds: Optional[Union[float, Dict[str, float]]] = None,
     y_disp_bounds: Optional[Tuple[float, float]] = None,
     x_disp_bounds: Optional[Tuple[float, float]] = None,
     group_colors: Optional[Dict[str, int]] = None,
@@ -99,9 +100,13 @@ def line_plot(
         `group_key=method`. This would produce two lines with no error shading.
         To get the error shading you would need multiple seed values per
         method.
+    :param legend_font_size: options 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
     :param avg_key: This is typically the seed.
     :param group_key: These are the different lines.
     :param smooth_factor: Can specify a different smooth factor per method if desired.
+    :param x_bounds: What the data plot values are stopped at (max number of
+        steps). This is in terms of x-axis value. This is either a mapping from
+        method name to steps, or steps that is applied to all methods.
     :param y_bounds: What the data plot values are clipped to.
     :param y_disp_bounds: What the plotting is stopped at.
     :param ax: If not specified, one is automatically created, with the
@@ -133,6 +138,8 @@ def line_plot(
         line_styles = {}
     if num_marker_points is None:
         num_marker_points = {}
+    if x_bounds is None:
+        x_bounds = {}
 
     if method_idxs is None:
         method_idxs = {k: i for i, k in enumerate(plot_df[group_key].unique())}
@@ -222,6 +229,19 @@ def line_plot(
         if use_smooth_factor != 0.0:
             y_vals = np.array(smooth_arr(y_vals, use_smooth_factor))
             y_std = np.array(smooth_arr(y_std, use_smooth_factor))
+
+        if isinstance(x_bounds, (float, int)):
+            limit_val = x_bounds
+        elif name in x_bounds:
+            limit_val = x_vals < x_bounds[name]
+        else:
+            limit_val = None
+
+        if limit_val is not None:
+            valid_points = x_vals < limit_val
+            y_vals = y_vals[valid_points]
+            x_vals = x_vals[valid_points]
+            y_std = y_std[valid_points]
 
         if n_drop_last_points is not None:
             y_vals = y_vals[:-n_drop_last_points]
