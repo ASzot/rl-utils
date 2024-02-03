@@ -101,6 +101,9 @@ def eval_ckpt(
     new_cmd = sub_in_vars(new_cmd, cfg, 0, "eval")
     new_cmd += " " + shlex.join(rest)
 
+    for orig, sub in eval_sys_cfg.get("replace_strs", {}).items():
+        new_cmd = new_cmd.replace(orig, sub)
+
     logger.info(f"EVALUATING {new_cmd}")
     os.system(new_cmd)
     return True
@@ -162,15 +165,16 @@ def get_ckpt_full_path(cfg, eval_sys_cfg, args, run_id) -> str:
 
 def add_eval_suffix(x):
     x = x.strip()
+    rnd = get_random_id()[:3]
     if x == "":
-        return get_random_id() + "_eval"
+        return f"{rnd}_eval"
+    elif x[-1] == "/":
+        return f"{x[:-1]}_eval{rnd}/"
     elif "." in x:
         parts = x.split(".")
-        return parts[0] + "_eval." + parts[1]
-    elif x[-1] == "/":
-        return x[:-1] + "_eval/"
+        return f"{parts[0]}_eval{rnd}.{parts[1]}"
     else:
-        return x + "_eval"
+        return f"{x}_eval{rnd}"
 
 
 def change_arg_vals(cmd_parts: List[str], new_arg_values: Dict[str, Any]) -> List[str]:
@@ -201,7 +205,6 @@ def change_arg_vals(cmd_parts: List[str], new_arg_values: Dict[str, Any]) -> Lis
 
 def split_cmd_txt(cmd: str) -> List[str]:
     cmd = cmd.replace("='", '="DELIM').replace("'", "'" + '"').replace("DELIM", "'")
-    [y for x in cmd.split(" ") for y in x.split("=")]
     return [y for x in shlex.split(cmd, posix=True) for y in x.split("=")]
 
 
@@ -221,7 +224,7 @@ def sub_in_eval_type(cmd_parts: List[str], args, eval_sys_cfg) -> List[str]:
             f"Could not find eval type lookup key {eval_sys_cfg.eval_type_lookup_k}"
         )
     eval_types = eval_sys_cfg.eval_types[args.eval]
-    add_args = eval_types[eval_type]
+    add_args = eval_types.get(eval_type, {})
     logger.info(f"Adding eval arguments for {eval_type}: {add_args}")
     return change_arg_vals(
         cmd_parts,
