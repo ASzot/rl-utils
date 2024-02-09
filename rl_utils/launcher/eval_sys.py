@@ -4,6 +4,7 @@ import os.path as osp
 import shlex
 import subprocess
 import uuid
+from functools import partial
 from typing import Any, Callable, Dict, List, Optional
 
 from omegaconf import OmegaConf
@@ -57,10 +58,15 @@ def eval_ckpt(
 
     cmd_parts = sub_in_eval_type(cmd_parts, args, eval_sys_cfg)
 
+    # Should be formatted like dir/ckpt.X.pth
+    ckpt_idx = int(model_ckpt_path.split(".")[-2])
     cmd_parts = change_arg_vals(
         cmd_parts,
         {
-            **{k: add_eval_suffix for k in eval_sys_cfg.add_eval_to_vals},
+            **{
+                k: partial(add_eval_suffix, ckpt_idx=ckpt_idx)
+                for k in eval_sys_cfg.add_eval_to_vals
+            },
             **eval_sys_cfg.change_vals,
         },
     )
@@ -144,37 +150,41 @@ def get_ckpt_path_search(cfg, eval_sys_cfg, args, run_id) -> str:
 
 
 def get_ckpt_full_path(cfg, eval_sys_cfg, args, run_id) -> str:
-    full_path = osp.join(cfg.base_data_dir, eval_sys_cfg.ckpt_search_dir, run_id)
+    full_dir = osp.join(cfg.base_data_dir, eval_sys_cfg.ckpt_search_dir, run_id)
+    if args.idx is not None:
+        full_path = osp.join(full_dir, f"ckpt.{args.idx}.pth")
+    else:
+        full_path = full_dir
     if not osp.exists(full_path) or args.force_search:
         return get_ckpt_path_search(cfg, eval_sys_cfg, args, run_id)
     ckpt_idxs = [
         int(f.split(".")[1])
-        for f in os.listdir(full_path)
+        for f in os.listdir(full_dir)
         if ".pth" in f and "ckpt" in f
     ]
     if args.idx is None:
         last_idx = max(ckpt_idxs)
     elif args.idx == -1:
         # Evaluate everything in the directory.
-        return full_path
+        return full_dir
     else:
         last_idx = args.idx
 
-    return osp.join(full_path, f"ckpt.{last_idx}.pth")
+    return osp.join(full_dir, f"ckpt.{last_idx}.pth")
 
 
-def add_eval_suffix(x):
+def add_eval_suffix(x, ckpt_idx: int):
     x = x.strip()
     rnd = get_random_id()[:3]
     if x == "":
-        return f"{rnd}_eval"
+        return f"{rnd}_eval_ck{ckpt_idx}"
     elif x[-1] == "/":
-        return f"{x[:-1]}_eval{rnd}/"
+        return f"{x[:-1]}_eval{rnd}_ck{ckpt_idx}/"
     elif "." in x:
         parts = x.split(".")
-        return f"{parts[0]}_eval{rnd}.{parts[1]}"
+        return f"{parts[0]}_eval{rnd}_ck{ckpt_idx}.{parts[1]}"
     else:
-        return f"{x}_eval{rnd}"
+        return f"{x}_eval{rnd}_ck{ckpt_idx}"
 
 
 def change_arg_vals(cmd_parts: List[str], new_arg_values: Dict[str, Any]) -> List[str]:
