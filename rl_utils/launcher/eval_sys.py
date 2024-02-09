@@ -150,25 +150,27 @@ def get_ckpt_path_search(cfg, eval_sys_cfg, args, run_id) -> str:
 
 
 def get_ckpt_full_path(cfg, eval_sys_cfg, args, run_id) -> str:
-    full_path = osp.join(cfg.base_data_dir, eval_sys_cfg.ckpt_search_dir, run_id)
+    full_dir = osp.join(cfg.base_data_dir, eval_sys_cfg.ckpt_search_dir, run_id)
     if args.idx is not None:
-        full_path = osp.join(full_path, f"ckpt.{args.idx}.pth")
+        full_path = osp.join(full_dir, f"ckpt.{args.idx}.pth")
+    else:
+        full_path = full_dir
     if not osp.exists(full_path) or args.force_search:
         return get_ckpt_path_search(cfg, eval_sys_cfg, args, run_id)
     ckpt_idxs = [
         int(f.split(".")[1])
-        for f in os.listdir(full_path)
+        for f in os.listdir(full_dir)
         if ".pth" in f and "ckpt" in f
     ]
     if args.idx is None:
         last_idx = max(ckpt_idxs)
     elif args.idx == -1:
         # Evaluate everything in the directory.
-        return full_path
+        return full_dir
     else:
         last_idx = args.idx
 
-    return osp.join(full_path, f"ckpt.{last_idx}.pth")
+    return osp.join(full_dir, f"ckpt.{last_idx}.pth")
 
 
 def add_eval_suffix(x, ckpt_idx: int):

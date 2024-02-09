@@ -4,7 +4,6 @@ from typing import Callable, Dict, List, Optional
 import numpy as np
 import pandas as pd
 from omegaconf import OmegaConf
-
 from rl_utils.plotting.utils import MISSING_VALUE
 from rl_utils.plotting.wb_query import fetch_data_from_cfg
 
@@ -158,6 +157,8 @@ def plot_table(
                 else:
                     if custom_cell_format_fn is None:
                         err = ""
+                        # Add a small constant so 0.5 is rounded up to 1.
+                        val = round(val + 1e-8, n_decimals)
                         if include_err and not np.isnan(std):
                             err = f"$ \\pm$ %.{n_decimals}f " % std
                             err = f"{{\\scriptsize {err} }}"
