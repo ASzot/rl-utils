@@ -622,11 +622,11 @@ def generate_slurm_batch_file(
     if args.speed:
         fcontents.append("#SBATCH --overcommit")
         fcontents.append("#SBATCH --cpu-freq=performance")
-    fcontents.append(f"#SBATCH --nodes 1")
-    fcontents.append(f"#SBATCH --signal=USR1@600")
+    fcontents.append("#SBATCH --nodes 1")
+    fcontents.append("#SBATCH --signal=USR1@600")
     if args.accel:
         # Accel handles starting jobs.
-        fcontents.append(f"#SBATCH --ntasks-per-node 1")
+        fcontents.append("#SBATCH --ntasks-per-node 1")
     else:
         fcontents.append(f"#SBATCH --ntasks-per-node {int(ntasks)}")
 
