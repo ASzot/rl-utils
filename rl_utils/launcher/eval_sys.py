@@ -1,8 +1,10 @@
 import argparse
 import os
 import os.path as osp
+import re
 import shlex
 import subprocess
+import time
 import uuid
 from typing import Any, Callable, Dict, List, Optional
 
@@ -101,6 +103,12 @@ def eval_ckpt(
     new_cmd = sub_in_vars(new_cmd, cfg, 0, "eval")
     new_cmd += " " + shlex.join(rest)
 
+    # Remove the accelerate launch command.
+    new_cmd = re.sub(
+        r"accelerate launch --main_process_port (\d+) --num_processes (\d+) --config_file ",
+        "",
+        new_cmd,
+    )
     for orig, sub in eval_sys_cfg.get("replace_strs", {}).items():
         new_cmd = new_cmd.replace(orig, sub)
 
@@ -111,8 +119,15 @@ def eval_ckpt(
 
 def get_ckpt_path_search(cfg, eval_sys_cfg, args, run_id) -> str:
     full_path = osp.join(cfg.base_data_dir, eval_sys_cfg.ckpt_search_dir, run_id)
-    if eval_sys_cfg.search_cmd is None:
-        return ""
+
+    if not args.force_search:
+        if osp.exists(full_path):
+            return full_path
+        else:
+            raise ValueError(
+                f"Could not find {run_id} from {eval_sys_cfg.ckpt_search_dir}"
+            )
+
     search_cmd = eval_sys_cfg.search_cmd.replace("$RUN_ID", run_id)
 
     logger.info(f"Searching with {search_cmd}")
@@ -143,24 +158,34 @@ def get_ckpt_path_search(cfg, eval_sys_cfg, args, run_id) -> str:
     return full_path
 
 
+def watch_directory(path, interval=1):
+    print(f"Watching directory: {path} every {interval} seconds")
+    already_seen = set(os.listdir(path))
+    while True:
+        time.sleep(interval)
+        current_files = set(os.listdir(path))
+        new_files = current_files - already_seen
+        if new_files:
+            for file in new_files:
+                yield os.path.join(path, file)
+            already_seen = current_files
+
+
 def get_ckpt_full_path(cfg, eval_sys_cfg, args, run_id) -> str:
-    full_path = osp.join(cfg.base_data_dir, eval_sys_cfg.ckpt_search_dir, run_id)
-    if not osp.exists(full_path) or args.force_search:
-        return get_ckpt_path_search(cfg, eval_sys_cfg, args, run_id)
+    full_path = get_ckpt_path_search(cfg, eval_sys_cfg, args, run_id)
     ckpt_idxs = [
         int(f.split(".")[1])
         for f in os.listdir(full_path)
         if ".pth" in f and "ckpt" in f
     ]
-    if args.idx is None:
+    if args.all:
+        return [osp.join(full_path, f"ckpt.{i}.pth") for i in ckpt_idxs]
+    elif args.idx is None:
         last_idx = max(ckpt_idxs)
-    elif args.idx == -1:
-        # Evaluate everything in the directory.
-        return full_path
     else:
         last_idx = args.idx
 
-    return osp.join(full_path, f"ckpt.{last_idx}.pth")
+    return [osp.join(full_path, f"ckpt.{last_idx}.pth")]
 
 
 def add_eval_suffix(x):
@@ -245,7 +270,7 @@ def run(
         "--idx",
         default=None,
         type=int,
-        help="If not specified, will evaluate the last checkpoint in the folder. If specified, this will evaluate the desired checkpoint index. If set to -1, this will evaluate all checkpoints in the folder.",
+        help="If not specified, will evaluate the last checkpoint in the folder. If specified, this will evaluate the desired checkpoint index.",
     )
     parser.add_argument("--cmd", default=None, type=str)
     parser.add_argument(
@@ -257,6 +282,11 @@ def run(
     parser.add_argument("--cd", default=None, type=str)
     parser.add_argument("--cfg", required=True, type=str)
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="If specified, will evaluate all checkpoints in folders.",
+    )
     parser.add_argument(
         "--force-search",
         action="store_true",
@@ -273,20 +303,19 @@ def run(
         rnd_id = str(uuid.uuid4())[:3]
         new_run_id = f"{run_id}_eval_{rnd_id}"
 
-        full_path = get_ckpt_full_path(cfg, eval_sys_cfg, args, run_id)
-
-        eval_ckpt(
-            run_id,
-            full_path,
-            new_run_id,
-            cfg,
-            args.proj_dat,
-            modify_run_cmd_fn,
-            args,
-            rest,
-        )
-        if args.debug:
-            break
+        for full_path in get_ckpt_full_path(cfg, eval_sys_cfg, args, run_id):
+            eval_ckpt(
+                run_id,
+                full_path,
+                new_run_id,
+                cfg,
+                args.proj_dat,
+                modify_run_cmd_fn,
+                args,
+                rest,
+            )
+            if args.debug:
+                break
 
 
 if __name__ == "__main__":
