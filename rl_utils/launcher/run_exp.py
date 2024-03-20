@@ -80,6 +80,9 @@ def get_arg_parser():
     parser.add_argument("--cfg", type=str, default=None)
     parser.add_argument("--base-data-dir", type=str, default=None)
 
+    # Accelerator options.
+    parser.add_argument("--accel", action="store_true")
+
     # MULTIPROC OPTIONS
     parser.add_argument("--pt-proc", type=int, default=-1)
     parser.add_argument("--rdzv-endpoint", type=str, default=None)
@@ -151,9 +154,14 @@ def get_arg_parser():
             """,
     )
     parser.add_argument(
-        "--constraint",
+        "--constraint", type=str, default=None, help="The slurm constraint type"
+    )
+    parser.add_argument("--qos", type=str, default=None, help="The slurm qos.")
+    parser.add_argument(
+        "--gpu-type",
         type=str,
         default=None,
+        help="The slurm gpu type (typically either this or the constraint type is used. Not both at the same time.",
     )
     parser.add_argument(
         "--cpu-mem",
@@ -486,6 +494,21 @@ def execute_command_file(run_cmd, args, proj_cfg):
 
         cmds[0] = make_dist_cmd(cmds[0])
 
+    if args.accel:
+        # Launching with accel. Just replace the python with the accel command.
+        assert (
+            args.pt_proc == -1
+        ), "Cannot use both torchrun via pt-proc and HF accelerate."
+        n_gpus = int(args.g)
+        assert n_gpus >= 1, "Must set num gpus for HF accelerate"
+        assert (
+            "accel_cfg" in proj_cfg
+        ), "Need to specify the location of the accelerate config in the project config yaml file"
+        use_port = 29500 + random.randint(0, 50)
+        accel_dist_str = f"accelerate launch --main_process_port {use_port} --num_processes {n_gpus} --config_file {proj_cfg['accel_cfg']}"
+
+        cmds[0] = cmds[0].replace("python", accel_dist_str)
+
     DELIM = " ; "
 
     cd = as_list(args.cd, n_cmds)
@@ -495,6 +518,7 @@ def execute_command_file(run_cmd, args, proj_cfg):
             os.system(cmd)
 
     if args.template is not None:
+        # Yaml launch
         template_cfg = proj_cfg["yaml_launch"]
         template_cmd = template_cfg["cmd"]
         for cmd_idx, cmd in enumerate(cmds):
@@ -505,8 +529,8 @@ def execute_command_file(run_cmd, args, proj_cfg):
             run_cmd = template_cmd % yamlize_cmd(run_cmd, template_cfg, args, ident)
             log(f"Running {run_cmd}", args)
             launch(run_cmd)
-
     elif args.sess_id == -1 and args.sess_name is None:
+        # Run job in the current session.
         if args.partition is not None:
             for cmd_idx, cmd in enumerate(cmds):
                 run_cmd = get_cmd_run_str(cmd, args, cmd_idx, n_cmds, proj_cfg)
@@ -570,30 +594,67 @@ def execute_command_file(run_cmd, args, proj_cfg):
 def generate_slurm_batch_file(
     log_file, ident, python_path, cmd, partition, ntasks, g, c, args, proj_cfg
 ):
-    ignore_nodes_s = ",".join(proj_cfg.get("slurm_ignore_nodes", []))
-    if len(ignore_nodes_s) != 0:
-        ignore_nodes_s = "#SBATCH -x " + ignore_nodes_s
-
-    add_options = [ignore_nodes_s]
-    if args.time is not None:
-        add_options.append(f"#SBATCH --time={args.time}")
-    if args.comment is not None:
-        add_options.append(f'#SBATCH --comment="{args.comment}"')
-    if args.constraint is not None:
-        add_options.append(f"#SBATCH --constraint={args.constraint}")
-    if args.cpu_mem is not None:
-        add_options.append(f"#SBATCH --mem-per-cpu={args.cpu_mem}")
-    add_options = "\n".join(add_options)
 
     python_parts = cmd.split("python")
     has_python = False
     if len(python_parts) > 1:
         cmd = "python" + python_parts[1]
         has_python = True
+    job_name = ident
 
+    fcontents = []
+    fcontents.append("#!/bin/bash")
+    fcontents.append(f"#SBATCH --job-name={job_name}")
+    fcontents.append(f"#SBATCH --output={log_file}")
+
+    # Requested GPU resources
+    if args.gpu_type is None:
+        use_gpu_type = "gpu"
+    else:
+        use_gpu_type = args.gpu_type
+    fcontents.append(f"#SBATCH -G {use_gpu_type}:{int(g)}")
+
+    c = int(c)
+    if args.accel:
+        # Since accel will force only using 1 task.
+        c *= ntasks
+    fcontents.append(f"#SBATCH --cpus-per-task {c}")
+    if args.speed:
+        fcontents.append("#SBATCH --overcommit")
+        fcontents.append("#SBATCH --cpu-freq=performance")
+    fcontents.append(f"#SBATCH --nodes 1")
+    fcontents.append(f"#SBATCH --signal=USR1@600")
+    if args.accel:
+        # Accel handles starting jobs.
+        fcontents.append(f"#SBATCH --ntasks-per-node 1")
+    else:
+        fcontents.append(f"#SBATCH --ntasks-per-node {int(ntasks)}")
+
+    # Optional options.
+    if args.qos is not None:
+        fcontents.append(f"#SBATCH --qos {args.qos}")
+    if args.time is not None:
+        fcontents.append(f"#SBATCH --time={args.time}")
+    if args.comment is not None:
+        fcontents.append(f'#SBATCH --comment="{args.comment}"')
+    if args.constraint is not None:
+        fcontents.append(f"#SBATCH --constraint={args.constraint}")
+    if args.cpu_mem is not None:
+        fcontents.append(f"#SBATCH --mem-per-cpu={args.cpu_mem}")
+
+    # Ignore node list.
+    ignore_nodes_s = ",".join(proj_cfg.get("slurm_ignore_nodes", []))
+    if len(ignore_nodes_s) != 0:
+        fcontents.append(f"#SBATCH -x {ignore_nodes_s}")
+
+    # Requeue and sub for absolute path
+    if has_python:
+        cmd = python_path + "/" + cmd
+        fcontents.append("#SBATCH --requeue")
+
+    fcontents.append(f"#SBATCH -p {partition}")
     if not args.skip_env:
-        env_vars = proj_cfg.get("add_env_vars", [])
-        env_vars = [f"export {x}" for x in env_vars]
+        fcontents.extend([f"export {x}" for x in proj_cfg.get("add_env_vars", [])])
 
         if args.proj_dat is not None:
             for k in args.proj_dat.split(","):
@@ -601,54 +662,18 @@ def generate_slurm_batch_file(
                 if env_var_dat is not None:
                     proj_env_vars = env_var_dat.split(" ")
                     for proj_env_var in proj_env_vars:
-                        env_vars.append(f"export {proj_env_var}")
+                        fcontents.append(f"export {proj_env_var}")
 
-        env_vars = "\n".join(env_vars)
-
-    cpu_options = "#SBATCH --cpus-per-task %i" % int(c)
-    if args.speed:
-        cpu_options += "#SBATCH --overcommit\n"
-        cpu_options += "#SBATCH --cpu-freq=performance\n"
-
-    if has_python:
-        run_cmd = python_path + "/" + cmd
-        requeue_s = "#SBATCH --requeue"
-    else:
-        run_cmd = cmd
-        requeue_s = ""
-
-    fcontents = """#!/bin/bash
-#SBATCH --job-name=%s
-#SBATCH --output=%s
-#SBATCH --gres gpu:%i
-%s
-#SBATCH --nodes 1
-#SBATCH --signal=USR1@600
-#SBATCH --ntasks-per-node %i
-%s
-#SBATCH -p %s
-%s
-
-MAIN_ADDR=$(scontrol show hostnames "${SLURM_JOB_NODELIST}" | head -n 1)
-export MAIN_ADDR
-%s
-
-set -x
-srun %s"""
-    job_name = ident
-    log_file_loc = "/".join(log_file.split("/")[:-1])
-    fcontents = fcontents % (
-        job_name,
-        log_file,
-        int(g),
-        cpu_options,
-        int(ntasks),
-        requeue_s,
-        partition,
-        add_options,
-        env_vars,
-        run_cmd,
+    fcontents.append(
+        'MAIN_ADDR=$(scontrol show hostnames "${SLURM_JOB_NODELIST}" | head -n 1)\n'
     )
+    fcontents.append("export MAIN_ADDR\n")
+
+    fcontents.append("set -x")
+    fcontents.append(f"srun {cmd}")
+
+    log_file_loc = "/".join(log_file.split("/")[:-1])
+    fcontents = "\n".join(fcontents)
     job_file = osp.join(log_file_loc, job_name + ".sh")
     with open(job_file, "w") as f:
         f.write(fcontents)
@@ -671,13 +696,23 @@ def full_execute_command_file():
         if args.time is None and "time" in def_slurm:
             args.time = def_slurm["time"]
 
+        if "g" in def_slurm:
+            # Set GPU.
+            args.g = def_slurm["g"]
+
         if args.partition is None and "partition" in def_slurm:
             args.partition = def_slurm["partition"]
+
+        if args.gpu_type is None and "gpu_type" in def_slurm:
+            args.gpu_type = def_slurm["gpu_type"]
 
         if args.constraint is None and "constraint" in def_slurm:
             args.constraint = def_slurm["constraint"]
 
         if args.cpu_mem is None and "cpu_mem" in def_slurm:
             args.cpu_mem = def_slurm["cpu_mem"]
+
+        if args.qos is None and "qos" in def_slurm:
+            args.qos = def_slurm["qos"]
 
     execute_command_file(rest, args, proj_cfg)
