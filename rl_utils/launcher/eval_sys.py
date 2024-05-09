@@ -30,7 +30,21 @@ def eval_ckpt(
     eval_sys_cfg = cfg.eval_sys
     # Find the run command.
     run_path = osp.join(RUN_DIR, run_id + ".sh")
-    if osp.exists(run_path):
+    add_all = cfg.get("add_all", None)
+    if args.cmd is not None:
+        logger.info("Got command from config.")
+        cmd = eval_sys_cfg.eval_run_cmd[args.cmd]
+
+        # Append the content all commands should have.
+        if add_all is not None:
+            cmd = sub_in_args(cmd, add_all)
+        cmd = sub_in_vars(cmd, cfg, 0, "eval")
+        ident = get_random_id()
+        cmd = cmd.replace("$SLURM_ID", ident)
+
+        cmd_parts = split_cmd_txt(cmd)
+
+    elif osp.exists(run_path):
         logger.info("Substituting slurm run command.")
         # Get the actually executed command.
         with open(run_path, "r") as f:
@@ -38,13 +52,11 @@ def eval_ckpt(
         cmd_parts = split_cmd_txt(cmd)
     else:
         logger.info("Substituting in the run command.")
-        if args.cmd is None:
-            cmd = get_run_command(
-                run_id, eval_sys_cfg.wandb_run_name_k, cfg.wb_entity, cfg.proj_name
-            )
-        else:
-            cmd = eval_sys_cfg.eval_run_cmd[args.cmd]
-        add_all = cfg.get("add_all", None)
+        cmd = get_run_command(
+            run_id, eval_sys_cfg.wandb_run_name_k, cfg.wb_entity, cfg.proj_name
+        )
+
+        # Append the content all commands should have.
         if add_all is not None and args.cmd is not None:
             # If `args.cmd` is None, then we used the old command which already
             # has the `add_all` content included.
@@ -79,7 +91,6 @@ def eval_ckpt(
             cmd_parts.extend(split_cmd_txt(cfg.proj_data[k]))
             add_env_vars.append(cfg.get("proj_dat_add_env_vars", {}).get(k, ""))
 
-    cmd_parts = cmd_parts[1:]
     cmd_parts = [*add_env_vars, *cmd_parts]
 
     if modify_run_cmd_fn is not None:
@@ -93,7 +104,7 @@ def eval_ckpt(
     new_cmd = (" ".join(cmd_parts[: python_file + 1])) + " "
     for i in range(python_file + 1, len(cmd_parts) - 1, 2):
         k, v = cmd_parts[i], cmd_parts[i + 1]
-        if k.startswith("--"):
+        if isinstance(k, str) and k.startswith("--"):
             sep = " "
         else:
             sep = eval_sys_cfg.sep

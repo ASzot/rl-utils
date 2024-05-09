@@ -1,4 +1,5 @@
 import argparse
+from collections import OrderedDict
 from typing import Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
@@ -51,6 +52,10 @@ def plot_bar(
     legend_n_cols: int = 1,
     minor_tick_count: Optional[int] = None,
     xaxis_label_colors: Optional[Dict[str, Tuple[float, float, float]]] = None,
+    bar_value_label_font_size: int = -1,
+    figsize: Tuple[float] = (6.4, 4.8),
+    xtick_groups: Optional[Dict[str, str]] = None,
+    replace_zero: Optional[float] = None,
 ):
     """
     :param group_key: The key to take the average/std over. Likely the method key.
@@ -73,14 +78,23 @@ def plot_bar(
         each major tick, these ticks will automatically be colored in as well.
     :param error_bar_color: Color of the error bar. Either a named color or a
         tuple like (0.2, 0.2, 0.2, 1.0) specifying RGBA.
+    :param bar_value_label_font_size: If != -1 then this will render the
+        numeric value of the bar above the bar in the plot. This controls the font
+        size of that bar value. The values are rounded to the nearest whole
+        number and displayed in the center of the bar.
+    :param xtick_groups: A mapping from the x-tick label to a label "group".
+        The group label is displayed below the x-axis labels.
+    :param replace_zero: If specified, this will replace any zero value. This
+        is used to give bars that have zero value some height to make them more
+        visible.
     """
 
     def_idx = [(k, i) for i, k in enumerate(plot_df[group_key].unique())]
     if name_ordering is None:
         name_ordering = [x for x, _ in def_idx]
-    colors = sns.color_palette()
+    color_pal = sns.color_palette()
     if name_colors is None and group_colors is None:
-        name_colors = {k: colors[v] for k, v in def_idx}
+        name_colors = {k: color_pal[v] for k, v in def_idx}
     if rename_map is None:
         rename_map = {}
     if xaxis_label_colors is None:
@@ -90,7 +104,10 @@ def plot_bar(
     plot_df = plot_df.replace("error", error_fill_value)
     plot_df[plot_key] = plot_df[plot_key].astype("float")
 
-    bar_grouped = plot_df.groupby(bar_group_key)
+    if bar_group_key is not None:
+        bar_grouped = plot_df.groupby(bar_group_key)
+    else:
+        bar_grouped = [("all", plot_df)]
     num_grouped = len(bar_grouped)
 
     bar_width = base_bar_width / num_grouped
@@ -102,7 +119,7 @@ def plot_bar(
     if group_name_ordering is None:
         group_name_ordering = list(grouped_bar_data.keys())
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=figsize)
     all_use_x = []
     for bar_group_name in group_name_ordering:
         sub_df = grouped_bar_data[bar_group_name]
@@ -111,18 +128,27 @@ def plot_bar(
 
         avg_y = []
         std_y = []
-        group_name_ordering = [n for n in name_ordering if n in df_avg_y.index]
+        within_group_name_ordering = [n for n in name_ordering if n in df_avg_y.index]
         is_missing = []
         is_error = []
-        for name in group_name_ordering:
+        for name in within_group_name_ordering:
             is_missing.append(df_avg_y.loc[name] == missing_fill_value)
             is_error.append(df_avg_y.loc[name] == error_fill_value)
             avg_y.append(df_avg_y.loc[name])
             std_y.append(df_std_y.loc[name] * error_scaling)
+
         if group_colors is None:
-            colors = [name_colors[x] for x in group_name_ordering]
+            # Bars clustered together will be colored differently
+            colors = [name_colors[x] for x in within_group_name_ordering]
+            labels = [rename_map.get(x, x) for x in within_group_name_ordering]
         else:
-            colors = [group_colors[bar_group_name] for _ in group_name_ordering]
+            # All bars clustered together will be colored the same.
+            colors = [group_colors[bar_group_name] for _ in within_group_name_ordering]
+            labels = rename_map.get(bar_group_name, bar_group_name)
+
+        # Convert to colors if we refer to colors as indices in sns color
+        # palette.
+        colors = [color_pal[x] if isinstance(x, int) else x for x in colors]
 
         N = len(avg_y)
         end_x = round(start_x + N * (bar_width + bar_pad), 3)
@@ -144,7 +170,8 @@ def plot_bar(
                 },
             }
 
-        use_name = rename_map.get(bar_group_name, bar_group_name)
+        if replace_zero is not None:
+            avg_y = [replace_zero if y == 0 else y for y in avg_y]
         bars = ax.bar(
             use_x,
             avg_y,
@@ -154,7 +181,7 @@ def plot_bar(
             alpha=bar_alpha,
             edgecolor=(0, 0, 0, 1.0),
             linewidth=bar_edge_thickness,
-            label=use_name,
+            label=labels,
             **kwargs,
         )
         start_x += within_group_spacing
@@ -170,6 +197,17 @@ def plot_bar(
                 bar.set_edgecolor((0, 0, 1, missing_opacity))
                 bar.set_hatch("//")
 
+            # Render text above the bar.
+            if bar_value_label_font_size > 0:
+                yval = bar.get_height()
+                ax.text(
+                    bar.get_x() + (bar.get_width() / 4),
+                    yval,
+                    int(round(yval, 0)),
+                    va="bottom",
+                    fontsize=12,
+                )
+
     if show_ticks:
         xtic_names = [rename_map.get(x, x) for x in name_ordering]
     else:
@@ -184,8 +222,16 @@ def plot_bar(
     ax.set_ylabel(rename_map.get(plot_key, plot_key), fontsize=axis_font_size)
     if xlabel is not None:
         ax.set_xlabel(xlabel, fontsize=axis_font_size)
+
     if y_disp_bounds is not None:
         ax.set_ylim(*y_disp_bounds)
+    if bar_value_label_font_size > 0:
+        # Adjust the height a bit to account for the labels on top of the bars.
+        cur_ylim = ax.get_ylim()
+        ax.set_ylim((cur_ylim[0], cur_ylim[1] + 5))
+
+    ax.grid(which="major", color="lightgray", linestyle="--")
+
     if title != "":
         ax.set_title(title)
     if legend:
@@ -199,16 +245,32 @@ def plot_bar(
     for lab in ax.get_yticklabels():
         lab.set_fontsize(tic_font_size)
 
+    if xtick_groups is not None:
+        # Render the x-tick groups.
+        groups = [xtick_groups[x] for x in name_ordering]
+        group_counts = OrderedDict((g, groups.count(g)) for g in dict.fromkeys(groups))
+        cur_bar_idx = 0
+        for group_name, count in group_counts.items():
+            label_color = xaxis_label_colors.get(name_ordering[cur_bar_idx], None)
+
+            avg_x_pos = np.mean([bars[cur_bar_idx + i].get_x() for i in range(count)])
+            cur_bar_idx += count
+
+            ax.text(
+                avg_x_pos,
+                -15,
+                rename_map.get(group_name, group_name),
+                ha="center",
+                va="top",
+                fontsize=tic_font_size,
+                color=label_color,
+            )
+
     x_axis = ax.xaxis
-    new_name_to_orig = {v: k for k, v in rename_map.items()}
-    for label in x_axis.get_ticklabels():
-        new_name = label.get_text()
-        orig_name = new_name_to_orig.get(new_name, new_name)
+    for orig_name, label in zip(name_ordering, x_axis.get_ticklabels()):
+        # Color x-tick names
         if orig_name in xaxis_label_colors:
-            color = np.array(xaxis_label_colors[orig_name], dtype=np.float32)
-            if sum(color) > 3:
-                color /= 255.0
-            label.set_color(color)
+            label.set_color(xaxis_label_colors[orig_name])
     return fig
 
 
