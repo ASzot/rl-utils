@@ -82,6 +82,12 @@ def get_arg_parser():
 
     # Accelerator options.
     parser.add_argument("--accel", action="store_true")
+    parser.add_argument(
+        "--prec",
+        default=None,
+        type=str,
+        help="Whether to override the accel mixed precision setting. Options are: no,fp16,bf16",
+    )
 
     # MULTIPROC OPTIONS
     parser.add_argument("--pt-proc", type=int, default=-1)
@@ -506,6 +512,8 @@ def execute_command_file(run_cmd, args, proj_cfg):
         ), "Need to specify the location of the accelerate config in the project config yaml file"
         use_port = 29500 + random.randint(0, 50)
         accel_dist_str = f"accelerate launch --main_process_port {use_port} --num_processes {n_gpus} --config_file {proj_cfg['accel_cfg']}"
+        if args.prec is not None:
+            accel_dist_str += f" --mixed_precision {args.prec}"
 
         cmds[0] = cmds[0].replace("python", accel_dist_str)
 
