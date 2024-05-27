@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from omegaconf import OmegaConf
-
 from rl_utils.plotting.utils import combine_dicts_to_df, fig_save
 from rl_utils.plotting.wb_query import batch_query
 
@@ -42,7 +41,8 @@ def make_steps_match(plot_df, seed_k, x_name, method_k):
                 max_len = len(run_df)
                 max_step_idxs = run_df[x_name]
         for _, run_df in grouped_runs:
-            run_df[x_name] = max_step_idxs[: len(run_df)]
+            sel_idxs = np.linspace(0, len(max_step_idxs) - 1, len(run_df), dtype=int)
+            run_df[x_name] = max_step_idxs[sel_idxs].to_numpy()
             all_dfs.append(run_df)
     return pd.concat(all_dfs)
 

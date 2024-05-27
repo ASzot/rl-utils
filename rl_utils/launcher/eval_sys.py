@@ -131,13 +131,8 @@ def eval_ckpt(
 def get_ckpt_path_search(cfg, eval_sys_cfg, args, run_id) -> str:
     full_path = osp.join(cfg.base_data_dir, eval_sys_cfg.ckpt_search_dir, run_id)
 
-    if not args.force_search:
-        if osp.exists(full_path):
-            return full_path
-        else:
-            raise ValueError(
-                f"Could not find {run_id} from {eval_sys_cfg.ckpt_search_dir}"
-            )
+    if not args.force_search and osp.exists(full_path):
+        return full_path
 
     search_cmd = eval_sys_cfg.search_cmd.replace("$RUN_ID", run_id)
 

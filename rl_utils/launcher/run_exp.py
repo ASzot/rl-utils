@@ -88,6 +88,12 @@ def get_arg_parser():
         type=str,
         help="Whether to override the accel mixed precision setting. Options are: no,fp16,bf16",
     )
+    parser.add_argument(
+        "--zs",
+        default=2,
+        type=int,
+        help="ZeRO stage for accelerate. Options are: 1,2,3",
+    )
 
     # MULTIPROC OPTIONS
     parser.add_argument("--pt-proc", type=int, default=-1)
@@ -386,9 +392,11 @@ def sub_in_vars(cmd, proj_cfg, rank_i, group_id, override_base_data_dir=None):
         cmd.replace("$GROUP_ID", group_id)
         .replace(
             "$DATA_DIR",
-            proj_cfg["base_data_dir"]
-            if override_base_data_dir is None
-            else override_base_data_dir,
+            (
+                proj_cfg["base_data_dir"]
+                if override_base_data_dir is None
+                else override_base_data_dir
+            ),
         )
         .replace("$CMD_RANK", str(rank_i))
         .replace("$PROJECT_NAME", proj_cfg.get("proj_name", ""))
@@ -413,16 +421,9 @@ def yamlize_cmd(cmd, template_cfg, args, ident):
     if "prefix_cmd" in template_cfg:
         cmd = template_cfg.prefix_cmd + " " + cmd
     base_template["command"] = cmd
-    num_gpus = int(args.g)
-    gpu_ratio = template_cfg["max_num_gpus"] / num_gpus
-    base_template["resources"]["num_gpus"] = num_gpus
-    # Scale other resource use by the number of gpus.
-    base_template["resources"]["num_cpus"] = int(
-        base_template["resources"]["num_cpus"] // gpu_ratio
-    )
-    base_template["resources"]["memory_gb"] = int(
-        base_template["resources"]["memory_gb"] // gpu_ratio
-    )
+    # num_gpus = int(args.g)
+    # base_template["resources"]["num_gpus"] = num_gpus
+
     base_template["resources"]["num_nodes"] = args.num_nodes
     if args.setup_command is not None:
         base_template["setup_command"] = args.setup_command
@@ -511,7 +512,7 @@ def execute_command_file(run_cmd, args, proj_cfg):
             "accel_cfg" in proj_cfg
         ), "Need to specify the location of the accelerate config in the project config yaml file"
         use_port = 29500 + random.randint(0, 50)
-        accel_dist_str = f"accelerate launch --main_process_port {use_port} --num_processes {n_gpus} --config_file {proj_cfg['accel_cfg']}"
+        accel_dist_str = f"accelerate launch --main_process_port {use_port} --num_processes {n_gpus} --zero_stage {args.zs} --config_file {proj_cfg['accel_cfg']}"
         if args.prec is not None:
             accel_dist_str += f" --mixed_precision {args.prec}"
 
