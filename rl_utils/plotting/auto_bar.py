@@ -92,7 +92,7 @@ def plot_bar(
     def_idx = [(k, i) for i, k in enumerate(plot_df[group_key].unique())]
     if name_ordering is None:
         name_ordering = [x for x, _ in def_idx]
-    color_pal = sns.color_palette()
+    color_pal = sns.color_palette("colorblind")
     if name_colors is None and group_colors is None:
         name_colors = {k: color_pal[v] for k, v in def_idx}
     if rename_map is None:
@@ -171,6 +171,7 @@ def plot_bar(
             }
 
         if replace_zero is not None:
+            should_replace_zero = [y == 0 for y in avg_y]
             avg_y = [replace_zero if y == 0 else y for y in avg_y]
         bars = ax.bar(
             use_x,
@@ -200,12 +201,15 @@ def plot_bar(
             # Render text above the bar.
             if bar_value_label_font_size > 0:
                 yval = bar.get_height()
+                disp_val = yval
+                if replace_zero is not None and should_replace_zero[i]:
+                    disp_val -= replace_zero
                 ax.text(
                     bar.get_x() + (bar.get_width() / 4),
                     yval,
-                    int(round(yval, 0)),
+                    int(round(disp_val, 0)),
                     va="bottom",
-                    fontsize=12,
+                    fontsize=bar_value_label_font_size,
                 )
 
     if show_ticks:
