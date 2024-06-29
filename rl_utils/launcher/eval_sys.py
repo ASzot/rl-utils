@@ -129,6 +129,10 @@ def eval_ckpt(
 
 
 def get_ckpt_path_search(cfg, eval_sys_cfg, args, run_id) -> str:
+    """
+    Returns the containing directory of the found checkpoint.
+    """
+
     full_path = osp.join(cfg.base_data_dir, eval_sys_cfg.ckpt_search_dir, run_id)
 
     if not args.force_search and osp.exists(full_path):
@@ -152,11 +156,11 @@ def get_ckpt_path_search(cfg, eval_sys_cfg, args, run_id) -> str:
         last_idx = args.idx
 
     ckpt_name = f"ckpt.{last_idx}.pth"
-    full_path = osp.join(full_path, ckpt_name)
+    ckpt_path = osp.join(full_path, ckpt_name)
     download_cmd = (
         eval_sys_cfg.download_cmd.replace("$RUN_ID", run_id)
         .replace("$CKPT", ckpt_name)
-        .replace("$FULL_PATH", full_path)
+        .replace("$FULL_PATH", ckpt_path)
     )
     logger.info(f"Downloading with {download_cmd}")
     os.system(download_cmd)

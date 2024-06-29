@@ -511,10 +511,17 @@ def execute_command_file(run_cmd, args, proj_cfg):
         assert (
             "accel_cfg" in proj_cfg
         ), "Need to specify the location of the accelerate config in the project config yaml file"
-        use_port = 29500 + random.randint(0, 50)
-        accel_dist_str = f"accelerate launch --main_process_port {use_port} --num_processes {n_gpus} --zero_stage {args.zs} --config_file {proj_cfg['accel_cfg']}"
+        accel_dist_str = f"accelerate launch --num_machines {args.num_nodes} --num_processes {n_gpus*args.num_nodes} --zero_stage {args.zs} --config_file {proj_cfg['accel_cfg']}"
         if args.prec is not None:
             accel_dist_str += f" --mixed_precision {args.prec}"
+
+        if args.num_nodes > 1:
+            accel_dist_str += f" --machine_rank {proj_cfg.machine_rank} --main_process_ip {proj_cfg.main_process_ip} --main_process_port {proj_cfg.main_process_port}"
+        else:
+            # Assign a random port so we can run multiple jobs on the same
+            # machine.
+            use_port = 29500 + random.randint(0, 50)
+            accel_dist_str += f" --main_process_port {use_port}"
 
         cmds[0] = cmds[0].replace("python", accel_dist_str)
 
