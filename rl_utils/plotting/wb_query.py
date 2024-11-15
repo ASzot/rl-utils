@@ -100,7 +100,7 @@ def query(
     wb_entity = proj_cfg["wb_entity"]
 
     cache_name = f"wb_queries_{select_fields}_{filter_fields}"
-    for bad_char in ["'", " ", "/", "[", "(", ")", "]"]:
+    for bad_char in ["'", " ", "/", "[", "(", ")", "]", "$", "*", "."]:
         cache_name = cache_name.replace(bad_char, "")
     cache = CacheHelper(cache_name)
 
@@ -124,6 +124,8 @@ def query(
             query_dict["tags"] = v
         elif f == "id":
             search_id = v
+        elif f in ["state", "createdAt"]:
+            query_dict[f] = v
         else:
             query_dict["config." + f] = v
 
@@ -134,7 +136,11 @@ def query(
     if search_id is None:
         log("Querying with")
         log(query_dict)
-        runs = api.runs(f"{wb_entity}/{wb_proj_name}", query_dict)
+        runs = api.runs(
+            f"{wb_entity}/{wb_proj_name}",
+            query_dict,
+            order="+created_at",
+        )
     else:
         log(f"Searching for ID {search_id}")
         runs = [api.run(f"{wb_entity}/{wb_proj_name}/{search_id}")]
@@ -166,6 +172,8 @@ def query(
                 max_idx = max(model_idxs)
                 final_model_f = osp.join(model_path, f"ckpt.{max_idx}.pth")
                 v = final_model_f
+            elif f == "startedAt":
+                v = run.metadata["startedAt"]
             elif f == "summary":
                 v = dict(run.summary)
                 v["status"] = str(run.state)
@@ -189,12 +197,14 @@ def query(
             else:
                 if f.startswith("ALL_"):
                     fetch_field = extract_query_key(f)
-                    df = run.history(samples=15000)
-                    if fetch_field not in df.columns:
+                    df = run.history(samples=100000)
+                    if fetch_field in df.columns:
+                        df = df[df[fetch_field].notna()]
+                        v = df[["_step", fetch_field]]
+                    elif not error_ok:
                         raise ValueError(
                             f"Could not find {fetch_field} in {df.columns} for query {filter_fields}"
                         )
-                    v = df[["_step", fetch_field]]
                 else:
                     if f not in run.summary:
                         if error_ok:
@@ -218,8 +228,7 @@ def query(
                 reduce_data[k].append(v)
         ret_data = {k: reduce_op(v) for k, v in reduce_data.items()}
 
-    log(f"Got data {ret_data}")
-    return ret_data
+    return ret_data  # noqa: R504
 
 
 def query_s(

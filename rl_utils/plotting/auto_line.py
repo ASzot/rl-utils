@@ -104,7 +104,8 @@ def line_plot(
     :param legend_font_size: options 'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'
     :param avg_key: This is typically the seed.
     :param group_key: These are the different lines.
-    :param smooth_factor: Can specify a different smooth factor per method if desired.
+    :param smooth_factor: Can specify a different smooth factor per method if
+        desired. A value of 0 means no smoothing.
     :param x_bounds: What the data plot values are stopped at (max number of
         steps). This is in terms of x-axis value. This is either a mapping from
         method name to steps, or steps that is applied to all methods.

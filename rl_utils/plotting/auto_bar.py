@@ -56,14 +56,30 @@ def plot_bar(
     figsize: Tuple[float] = (6.4, 4.8),
     xtick_groups: Optional[Dict[str, str]] = None,
     replace_zero: Optional[float] = None,
+    value_scaling: float = 1.0,
+    color_palette_name="colorblind",
 ):
     """
-    :param group_key: The key to take the average/std over. Likely the method key.
-    :param name_ordering: Order of the group names on the x-axis.
-    :param group_name_ordering: Order of the bars within a group.
+    :param group_key: This key defines the "x-axis" of the bar graph. So if you
+        want a bar per method, then this should be the method key. If you want a
+        "grouped" bar graph where each group has a set of bars, and these groups
+        are spaced with with the group names at the bottom, then this should be
+        that group key.
+    :param name_ordering: Order of the group names on the x-axis. This refers
+        to the names of "groups" if you are only plotting a single bar per group,
+        then this corresponds to values in `group_key` if there are multiple bars
+        clustered within a group, then this refers to `bar_group_key`.
+    :param group_name_ordering: Order of the bars within a group. In other
+        words, the order of bars that are spaced next to each other for a grouped
+        bar graph. This is only relevant when `bar_group_key` is set.
     :param bar_pad: Distance between bar groups
     :param within_group_padding: Distance between bars within bar group.
-    :param bar_group_key: Group columns next to each other.
+    :param bar_group_key: How to divide up bars within a group. If you are not
+        doing a grouped bar graph then don't set this. For a grouped bar graph this
+        defines what the bars "within a group" (meaning next to each other) are. So
+        if I want bars to be grouped per benchmark and individual bars per method
+        (meaning bars per benchmark are next to each other) I would set
+        `group_key=method` and `bar_group_key=benchmark`.
     :param base_bar_width: Bar width. Scaled by the # of bars per group.
     :param group_colors: Maps the bar group key to a color (RGB float tuple
         [0,1]). Overrides `name_colors`.
@@ -87,14 +103,15 @@ def plot_bar(
     :param replace_zero: If specified, this will replace any zero value. This
         is used to give bars that have zero value some height to make them more
         visible.
+    :param value_scaling: Multiply all plotted values by this amount.
     """
 
-    def_idx = [(k, i) for i, k in enumerate(plot_df[group_key].unique())]
     if name_ordering is None:
+        def_idx = [(k, i) for i, k in enumerate(plot_df[group_key].unique())]
         name_ordering = [x for x, _ in def_idx]
-    color_pal = sns.color_palette("colorblind")
+    color_pal = sns.color_palette(color_palette_name)
     if name_colors is None and group_colors is None:
-        name_colors = {k: color_pal[v] for k, v in def_idx}
+        name_colors = {k: color_pal[i] for i, k in enumerate(name_ordering)}
     if rename_map is None:
         rename_map = {}
     if xaxis_label_colors is None:
@@ -134,7 +151,7 @@ def plot_bar(
         for name in within_group_name_ordering:
             is_missing.append(df_avg_y.loc[name] == missing_fill_value)
             is_error.append(df_avg_y.loc[name] == error_fill_value)
-            avg_y.append(df_avg_y.loc[name])
+            avg_y.append(df_avg_y.loc[name] * value_scaling)
             std_y.append(df_std_y.loc[name] * error_scaling)
 
         if group_colors is None:
