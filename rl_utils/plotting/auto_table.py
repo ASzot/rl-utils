@@ -4,7 +4,6 @@ from typing import Callable, Dict, List, Optional
 import numpy as np
 import pandas as pd
 from omegaconf import OmegaConf
-
 from rl_utils.plotting.utils import MISSING_VALUE
 from rl_utils.plotting.wb_query import fetch_data_from_cfg
 
@@ -22,6 +21,7 @@ def plot_table(
     missing_fill_value=MISSING_VALUE,
     error_fill_value=0.3444,
     get_row_highlights: Optional[Callable[[str, pd.DataFrame], Optional[str]]] = None,
+    get_col_highlights: Optional[Callable[[str, pd.DataFrame], Optional[str]]] = None,
     make_col_header: Optional[Callable[[int], str]] = None,
     x_label: str = "",
     y_label: str = "",
@@ -31,19 +31,18 @@ def plot_table(
     err_key: Optional[str] = None,
     add_tabular: bool = True,
     add_botrule: bool = False,
-    bold_row_names: bool = True,
+    name_bold_fn: Optional[Callable[[str], str]] = None,
     show_row_labels: bool = True,
     show_col_labels: bool = True,
     compute_err_fn: Optional[Callable[[pd.Series], pd.Series]] = None,
     value_scaling: float = 1.0,
     midrule_formatting: str = "\\midrule\n",
     botrule_formatting: str = "\\bottomrule",
+    text_columns: Optional[Dict[str, Dict[str, str]]] = None,
+    alternating_color_rows: bool = False,
     custom_cell_format_fn: Optional[
         Callable[
-            [
-                float,
-                float,
-            ],
+            [float, float, str, str],
             str,
         ]
     ] = None,
@@ -63,6 +62,14 @@ def plot_table(
     :param err_key: If non-None, this will be used as the error and override any error calculation.
     :param show_row_labels: If False, the row names are not diplayed, and no
         column for the row name is displayed.
+    :param custom_cell_format_fn: A function that takes as input the cell
+        value, standard deviation, the column and row name, and the columns to
+        bold their values and returns the latex content that should be
+        displayed at that cell.
+    :param alternating_color_rows: If True, will color odd rows with `Gray`
+        color. You must define this color in your latex doc via
+        `\definecolor{Gray}{gray}{0.95}`. Note that an `hline` row resets this
+        count.
 
     Example: the data fame might look like
     ```
@@ -82,6 +89,8 @@ def plot_table(
     grouped together.
 
     """
+    if text_columns is None:
+        text_columns = {}
     df[cell_key] = df[cell_key] * value_scaling
     if make_col_header is None:
 
@@ -127,26 +136,56 @@ def plot_table(
         row_str.append("\\textbf{%s}" % clean_text(renames.get(col_k, col_k)))
     all_s.append(col_sep.join(row_str))
 
+    row_index = 0
     for row_k in row_order:
         if row_k == "hline":
+            row_index = 0
             all_s.append("\\hline")
             continue
         row_str = []
 
         if show_row_labels:
-            if bold_row_names:
+            if name_bold_fn is None:
                 row_str.append("\\textbf{%s}" % clean_text(renames.get(row_k, row_k)))
             else:
-                row_str.append(clean_text(renames.get(row_k, row_k)))
+                row_str.append(name_bold_fn(clean_text(renames.get(row_k, row_k))))
 
+        if row_k not in rows:
+            print("Could not find ", row_k)
+            row_str.extend(["" for _ in col_order])
+            all_s.append(col_sep.join(row_str))
+            continue
         row_y, row_std = rows[row_k]
 
         if get_row_highlights is not None:
             sel_cols = get_row_highlights(row_k, row_y)
+        elif get_col_highlights is not None:
+            all_col_values = {
+                col: pd.Series(
+                    {
+                        row_name: row_y[col]
+                        for row_name, (row_y, _) in rows.items()
+                        if col in row_y
+                    }
+                )
+                for col in col_order
+            }
+
+            sel_cols = []
+            for col_k, col_values in all_col_values.items():
+                sel_rows_for_col = get_col_highlights(col_k, col_values)
+                # If we want to select the current row, add the column to be
+                # bolded.
+                if row_k in sel_rows_for_col:
+                    sel_cols.append(col_k)
+
         else:
             sel_cols = None
+
         for col_k in col_order:
-            if col_k not in row_y:
+            if col_k in text_columns:
+                row_str.append(text_columns[col_k].get(row_k, "-"))
+            elif col_k not in row_y:
                 row_str.append("-")
             else:
                 val = row_y.loc[col_k]
@@ -166,10 +205,14 @@ def plot_table(
                         if sel_cols is not None and col_k in sel_cols:
                             txt = "\\textbf{ " + txt + " }"
                     else:
-                        txt = custom_cell_format_fn(val, err)
+                        txt = custom_cell_format_fn(val, std, col_k, row_k, sel_cols)
                     row_str.append(txt)
 
-        all_s.append(col_sep.join(row_str))
+        row_index += 1
+        row_str = col_sep.join(row_str)
+        if row_index % 2 == 0 and alternating_color_rows:
+            row_str = "\\rowcolor{Gray} " + row_str
+        all_s.append(row_str)
 
     n_columns = len(col_order)
     if show_row_labels:
