@@ -12,9 +12,10 @@ from typing import Any, Callable, Dict, List, Optional
 import numpy as np
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
+from tqdm import tqdm
+
 from rl_utils.common.core_utils import CacheHelper
 from rl_utils.plotting.utils import MISSING_VALUE
-from tqdm import tqdm
 
 
 def extract_query_key(k):
@@ -228,7 +229,7 @@ def query(
                 reduce_data[k].append(v)
         ret_data = {k: reduce_op(v) for k, v in reduce_data.items()}
 
-    return ret_data
+    return ret_data  # noqa: R504
 
 
 def query_s(

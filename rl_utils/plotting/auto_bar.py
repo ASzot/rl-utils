@@ -8,6 +8,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.ticker import AutoMinorLocator
 from omegaconf import OmegaConf
+
 from rl_utils.plotting.utils import fig_save
 from rl_utils.plotting.wb_query import batch_query
 

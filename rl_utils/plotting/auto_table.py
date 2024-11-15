@@ -4,6 +4,7 @@ from typing import Callable, Dict, List, Optional
 import numpy as np
 import pandas as pd
 from omegaconf import OmegaConf
+
 from rl_utils.plotting.utils import MISSING_VALUE
 from rl_utils.plotting.wb_query import fetch_data_from_cfg
 
@@ -68,7 +69,7 @@ def plot_table(
         displayed at that cell.
     :param alternating_color_rows: If True, will color odd rows with `Gray`
         color. You must define this color in your latex doc via
-        `\definecolor{Gray}{gray}{0.95}`. Note that an `hline` row resets this
+        `definecolor{Gray}{gray}{0.95}`. Note that an `hline` row resets this
         count.
 
     Example: the data fame might look like
