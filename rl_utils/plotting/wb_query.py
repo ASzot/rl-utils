@@ -12,7 +12,6 @@ from typing import Any, Callable, Dict, List, Optional
 import numpy as np
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
-from tqdm import tqdm
 
 from rl_utils.common.core_utils import CacheHelper
 from rl_utils.plotting.utils import MISSING_VALUE
@@ -149,7 +148,7 @@ def query(
     log(f"Returned {len(runs)} runs")
 
     ret_data = []
-    for rank_i, run in tqdm(enumerate(runs)):
+    for rank_i, run in enumerate(runs):
         dat = {"rank": rank_i}
         for f in select_fields:
             v = None
