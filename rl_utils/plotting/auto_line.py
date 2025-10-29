@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from omegaconf import OmegaConf
-
 from rl_utils.plotting.utils import combine_dicts_to_df, fig_save
 from rl_utils.plotting.wb_query import batch_query
 
@@ -154,7 +153,7 @@ def line_plot(
         if group_colors is None:
             group_colors = method_idxs
 
-        colors = sns.color_palette()
+        colors = sns.color_palette("colorblind")
         group_colors = {k: colors[i] for k, i in group_colors.items()}
     else:
         group_colors = override_colors

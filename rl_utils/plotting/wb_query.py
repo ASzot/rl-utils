@@ -12,7 +12,6 @@ from typing import Any, Callable, Dict, List, Optional
 import numpy as np
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
-
 from rl_utils.common.core_utils import CacheHelper
 from rl_utils.plotting.utils import MISSING_VALUE
 
@@ -87,7 +86,7 @@ def query(
     :param select_fields: The list of data to retrieve. If a field starts with
         "ALL_", then all the entries for this name from W&B are fetched. This gets
         the ENTIRE history. Other special keys include: "_runtime" (in
-        seconds), "_timestamp".
+        seconds), "_timestamp", "ALL_" (by itself) gets all the data from this run.
     :param filter_fields: Key is the filter type (like group or tag) and value
         is the filter value (like the name of the group or tag to match)
     :param reduce_op: `np.mean` would take the average of the results.
@@ -195,7 +194,9 @@ def query(
                 for k in parts:
                     v = v[k]
             else:
-                if f.startswith("ALL_"):
+                if f == "ALL_":
+                    v = run.history(samples=100000)
+                elif f.startswith("ALL_"):
                     fetch_field = extract_query_key(f)
                     df = run.history(samples=100000)
                     if fetch_field in df.columns:
