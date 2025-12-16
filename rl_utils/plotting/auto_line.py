@@ -1,6 +1,6 @@
 import argparse
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -84,6 +84,7 @@ def line_plot(
     subsample_factor: Optional[int] = None,
     n_drop_last_points: Optional[int] = None,
     n_drop_first_points: Optional[int] = None,
+    line_labels: Optional[Dict[str, Any]] = None,
 ):
     """
     :param plot_df: The data to plot. The `avg_key`, `group_key`, `x_name`, and `y_name` all refer to columns in this dataframe. An example dataframe:
@@ -127,6 +128,8 @@ def line_plot(
         that.
     :param n_drop_first_points: Removes this number of points from the start of
         the line.
+    :param line_labels: A dictionary mapping the method name to a tuple containing (label, x_axis_idx, color, fontsize, y_offset). This plots a name label centered at the plot. The `x_axis_idx` controls where the label is placed on the x-axis relative to the x-axis plot points. 0 means the first x-axis point for this line. `y_offset` is the offset from the center of the line.
+
 
     :returns: The plotted figure.
     """
@@ -141,6 +144,8 @@ def line_plot(
         num_marker_points = {}
     if x_bounds is None:
         x_bounds = {}
+    if line_labels is None:
+        line_labels = {}
 
     if method_idxs is None:
         method_idxs = {k: i for i, k in enumerate(plot_df[group_key].unique())}
@@ -257,6 +262,18 @@ def line_plot(
         if name in line_styles:
             add_kwargs["linestyle"] = line_styles[name]
         line_to_add = ax.plot(x_vals, y_vals, **add_kwargs)
+        if name in line_labels:
+            label, x_axis_idx, color, fontsize, y_offset = line_labels[name]
+            ax.text(
+                x_vals[x_axis_idx],
+                y_vals[x_axis_idx] + y_offset,
+                label,
+                ha="left",
+                va="center",
+                color=color,
+                fontsize=fontsize,
+            )
+
         sel_vals = [
             int(x)
             for x in np.linspace(0, len(x_vals) - 1, num=num_marker_points.get(name, 8))
