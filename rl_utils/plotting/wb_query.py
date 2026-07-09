@@ -189,10 +189,14 @@ def query(
                 v = run.id
             elif f.startswith("config."):
                 config_parts = f.split("config.")
-                parts = config_parts[1].split(".")
-                v = run.config
-                for k in parts:
-                    v = v[k]
+                config_key = config_parts[1]
+                if config_key in run.config:
+                    v = run.config[config_key]
+                else:
+                    parts = config_key.split(".")
+                    v = run.config
+                    for k in parts:
+                        v = v[k]
             else:
                 if f == "ALL_":
                     v = run.history(samples=100000)

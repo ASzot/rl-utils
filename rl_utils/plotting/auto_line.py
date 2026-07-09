@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 from rl_utils.plotting.utils import combine_dicts_to_df, fig_save
 from rl_utils.plotting.wb_query import batch_query
 
@@ -26,6 +26,30 @@ def smooth_arr(scalars: List[float], weight: float) -> List[float]:
         smoothed_val = last * weight + (1 - weight) * point  # Calculate smoothed value
         smoothed.append(smoothed_val)  # Save it
         last = smoothed_val  # Anchor the last smoothed value
+
+    return smoothed
+
+
+def smooth_arr_ma(scalars: List[float], window_size: int) -> List[float]:
+    """
+    Simple moving average (trailing / causal).
+
+    Each output at index i is the mean of
+    scalars[max(0, i - window_size + 1) : i + 1].
+    """
+    if window_size <= 0:
+        raise ValueError("window_size must be >= 1")
+
+    smoothed = []
+    cumsum = 0.0
+
+    for i, x in enumerate(scalars):
+        cumsum += x
+        if i >= window_size:
+            cumsum -= scalars[i - window_size]
+            smoothed.append(cumsum / window_size)
+        else:
+            smoothed.append(cumsum / (i + 1))
 
     return smoothed
 
@@ -85,6 +109,8 @@ def line_plot(
     n_drop_last_points: Optional[int] = None,
     n_drop_first_points: Optional[int] = None,
     line_labels: Optional[Dict[str, Any]] = None,
+    plot_linewidth: int = 2,
+    moving_average_smoothing: Union[Dict[str, int], int] = None,
 ):
     """
     :param plot_df: The data to plot. The `avg_key`, `group_key`, `x_name`, and `y_name` all refer to columns in this dataframe. An example dataframe:
@@ -129,6 +155,7 @@ def line_plot(
     :param n_drop_first_points: Removes this number of points from the start of
         the line.
     :param line_labels: A dictionary mapping the method name to a tuple containing (label, x_axis_idx, color, fontsize, y_offset). This plots a name label centered at the plot. The `x_axis_idx` controls where the label is placed on the x-axis relative to the x-axis plot points. 0 means the first x-axis point for this line. `y_offset` is the offset from the center of the line.
+    :param plot_linewidth: The width of the lines to plot.
 
 
     :returns: The plotted figure.
@@ -146,6 +173,8 @@ def line_plot(
         x_bounds = {}
     if line_labels is None:
         line_labels = {}
+    if moving_average_smoothing is None:
+        moving_average_smoothing = {}
 
     if method_idxs is None:
         method_idxs = {k: i for i, k in enumerate(plot_df[group_key].unique())}
@@ -199,7 +228,7 @@ def line_plot(
             names.append(n.get_text())
             lines.append((all_lines[i * 2 + 1], all_lines[i * 2]))
 
-    if not isinstance(smooth_factor, dict):
+    if not isinstance(smooth_factor, (dict, DictConfig)):
         smooth_factor_lookup = defaultdict(lambda: smooth_factor)
     else:
         smooth_factor_lookup = defaultdict(lambda: 0.0)
@@ -230,6 +259,14 @@ def line_plot(
             y_std = y_std[::subsample_factor]
             y_vals = y_vals[::subsample_factor]
             x_vals = x_vals[::subsample_factor]
+
+        if isinstance(moving_average_smoothing, (int, float)):
+            use_moving_average_smoothing = moving_average_smoothing
+        else:
+            use_moving_average_smoothing = moving_average_smoothing.get(name, 1)
+        if use_moving_average_smoothing != 1:
+            y_vals = np.array(smooth_arr_ma(y_vals, use_moving_average_smoothing))
+            y_std = np.array(smooth_arr_ma(y_std, use_moving_average_smoothing))
 
         use_smooth_factor = smooth_factor_lookup[name]
         if use_smooth_factor != 0.0:
@@ -292,7 +329,7 @@ def line_plot(
 
         lines.append((ladd[0], line_to_add[0]))
 
-        plt.setp(line_to_add, linewidth=2, color=group_colors[name])
+        plt.setp(line_to_add, linewidth=plot_linewidth, color=group_colors[name])
         min_y_fill = y_vals - y_std
         max_y_fill = y_vals + y_std
 
