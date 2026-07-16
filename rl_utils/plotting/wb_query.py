@@ -6,6 +6,7 @@ import os
 import os.path as osp
 from argparse import ArgumentParser
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pprint import pprint
 from typing import Any, Callable, Dict, List, Optional
 
@@ -35,9 +36,14 @@ def batch_query(
     reduce_op: Optional[Callable[[List], float]] = None,
     error_ok: bool = False,
     timeout=None,
+    max_workers: Optional[int] = None,
 ):
     """
     - all_should_skip: Whether to skip querying this value.
+    - max_workers: If set and > 1, the individual W&B queries are issued
+      concurrently using a thread pool with at most this many requests in
+      flight at once. Results keep the same order as the inputs. Defaults to
+      sequential (one request at a time).
     """
     n_query = len(all_select_fields)
     if all_add_info is None:
@@ -45,23 +51,34 @@ def batch_query(
     if all_should_skip is None:
         all_should_skip = [False for _ in range(n_query)]
 
+    def run_query(select_fields, filter_fields, should_skip):
+        if should_skip:
+            return []
+        return query(
+            select_fields,
+            filter_fields,
+            proj_cfg,
+            verbose,
+            limit,
+            use_cached,
+            reduce_op,
+            error_ok=error_ok,
+            timeout=timeout,
+        )
+
+    query_args = list(zip(all_select_fields, all_filter_fields, all_should_skip))
+    if max_workers is not None and max_workers > 1 and n_query > 1:
+        # Network-bound requests: threads run concurrently while W&B I/O
+        # releases the GIL. `map` preserves input order and re-raises errors.
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            all_results = list(executor.map(lambda a: run_query(*a), query_args))
+    else:
+        all_results = [run_query(*a) for a in query_args]
+
     data = []
-    for select_fields, filter_fields, should_skip, add_info in zip(
-        all_select_fields, all_filter_fields, all_should_skip, all_add_info
+    for (select_fields, _, _), add_info, r in zip(
+        query_args, all_add_info, all_results
     ):
-        r = []
-        if not should_skip:
-            r = query(
-                select_fields,
-                filter_fields,
-                proj_cfg,
-                verbose,
-                limit,
-                use_cached,
-                reduce_op,
-                error_ok=error_ok,
-                timeout=timeout,
-            )
         if len(r) == 0:
             r = [{k: MISSING_VALUE for k in select_fields}]
         for d in r:
