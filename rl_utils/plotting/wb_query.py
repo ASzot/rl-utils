@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, List, Optional
 import numpy as np
 import pandas as pd
 from omegaconf import DictConfig, OmegaConf
+
 from rl_utils.common.core_utils import CacheHelper
 from rl_utils.plotting.utils import MISSING_VALUE
 
@@ -123,7 +124,7 @@ def query(
             query_dict["tags"] = v
         elif f == "id":
             search_id = v
-        elif f in ["state", "createdAt"]:
+        elif f in ["state", "createdAt", "display_name"]:
             query_dict[f] = v
         else:
             query_dict["config." + f] = v
