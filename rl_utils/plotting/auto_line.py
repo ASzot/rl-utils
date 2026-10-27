@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from omegaconf import DictConfig, OmegaConf
+
 from rl_utils.plotting.utils import combine_dicts_to_df, fig_save
 from rl_utils.plotting.wb_query import batch_query
 
@@ -252,6 +253,7 @@ def line_plot(
             f"{name}: n_seeds: {len(method_runs[name])} (from WB run IDs {list(method_runs[name])})",
             max(use_y_vals),
             use_y_vals[-1],
+            f" avg={np.mean(use_y_vals[-1])}",
         )
         y_std = sub_df["std"].fillna(0).to_numpy()
 
